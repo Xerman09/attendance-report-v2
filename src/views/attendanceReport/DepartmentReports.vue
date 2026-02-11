@@ -14,15 +14,15 @@
 
           <button class="btn btn-print no-print" @click="printDetails">
             <svg
-              class="btn-icon"
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              fill="currentColor"
-              aria-hidden="true"
+                class="btn-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="currentColor"
+                aria-hidden="true"
             >
               <path
-                d="M6 9V2h12v7h1a3 3 0 0 1 3 3v5h-4v4H6v-4H2v-5a3 3 0 0 1 3-3h1Zm2-7h8v7H8V2Zm8 18H8v2h8v-2ZM4 12v3h16v-3a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1Zm3-7h8v2H7V5Z"
+                  d="M6 9V2h12v7h1a3 3 0 0 1 3 3v5h-4v4H6v-4H2v-5a3 3 0 0 1 3-3h1Zm2-7h8v7H8V2Zm8 18H8v2h8v-2ZM4 12v3h16v-3a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1Zm3-7h8v2H7V5Z"
               />
             </svg>
             <span>Print</span>
@@ -36,9 +36,9 @@
           <label>Department</label>
           <select v-model.number="deptId">
             <option
-              v-for="d in departments"
-              :key="d.department_id"
-              :value="d.department_id"
+                v-for="d in departments"
+                :key="d.department_id"
+                :value="d.department_id"
             >
               {{ d.department_name }}
             </option>
@@ -53,10 +53,10 @@
         <div class="field">
           <label>Date To</label>
           <input
-            type="date"
-            v-model="endDate"
-            :min="startDate || minStartStr"
-            :max="yesterdayStr"
+              type="date"
+              v-model="endDate"
+              :min="startDate || minStartStr"
+              :max="yesterdayStr"
           />
         </div>
 
@@ -105,73 +105,73 @@
           </h4>
           <table class="table">
             <thead>
-              <tr>
-                <th class="col-name">Name</th>
-                <th>Work Hours</th>
-                <th>Overtime</th>
-                <th>Late</th>
-                <th>Punctuality</th>
-                <th>Status</th>
-              </tr>
+            <tr>
+              <th class="col-name">Name</th>
+              <th>Work Hours</th>
+              <th>Overtime</th>
+              <th>Late</th>
+              <th>Punctuality</th>
+              <th>Status</th>
+            </tr>
             </thead>
             <tbody>
-              <tr
+            <tr
                 v-for="r in group.rows"
                 :key="r.key"
                 :class="{ 'row-consistent': r.consistentlyOnTime }"
-              >
-                <td class="col-name">
-                  <div class="emp-name">
-                    {{ r.empName || r.name || r.employee_name || "-" }}
-                  </div>
-                </td>
-                <td class="mono">
-                  {{
-                    typeof r.workMinutes === "number" ? minutesToHHMM(r.workMinutes) : "-"
-                  }}
-                </td>
-                <td class="mono">
-                  {{
-                    typeof r.overtimeMinutes === "number"
+            >
+              <td class="col-name">
+                <div class="emp-name">
+                  {{ r.empName || r.name || r.employee_name || "-" }}
+                </div>
+              </td>
+              <td class="mono">
+                {{
+                  typeof r.workMinutes === "number" ? minutesToHHMM(r.workMinutes) : "-"
+                }}
+              </td>
+              <td class="mono">
+                {{
+                  typeof r.overtimeMinutes === "number"
                       ? minutesToHHMM(r.overtimeMinutes)
                       : "-"
-                  }}
-                </td>
-                <td class="mono">
-                  {{
-                    typeof r.lateMinutes === "number" ? minutesToHHMM(r.lateMinutes) : "-"
-                  }}
-                </td>
-                <td>
+                }}
+              </td>
+              <td class="mono">
+                {{
+                  typeof r.lateMinutes === "number" ? minutesToHHMM(r.lateMinutes) : "-"
+                }}
+              </td>
+              <td>
                   <span
-                    class="chip"
-                    :class="
+                      class="chip"
+                      :class="
                       r.punctuality === 'On Time'
                         ? 'chip-ok'
                         : r.punctuality === 'Late'
                         ? 'chip-warn'
                         : 'chip-muted'
                     "
-                    >{{ r.punctuality }}</span
+                  >{{ r.punctuality }}</span
                   >
-                </td>
-                <td>
+              </td>
+              <td>
                   <span
-                    class="chip"
-                    :class="
+                      class="chip"
+                      :class="
                       computeRowStatus(r) === 'Present'
                         ? 'chip-ok'
                         : computeRowStatus(r) === 'Absent'
                         ? 'chip-danger'
                         : 'chip-muted'
                     "
-                    >{{ computeRowStatus(r) }}</span
+                  >{{ computeRowStatus(r) }}</span
                   >
-                </td>
-              </tr>
-              <tr v-if="group.rows.length === 0">
-                <td colspan="6" class="muted center">No records.</td>
-              </tr>
+              </td>
+            </tr>
+            <tr v-if="group.rows.length === 0">
+              <td colspan="6" class="muted center">No records.</td>
+            </tr>
             </tbody>
           </table>
         </template>
@@ -216,6 +216,22 @@ const q = ref("");
 
 const printRef = ref(null);
 
+/* ---------------- Inactive detection (hide anywhere) ---------------- */
+function isActiveUser(u) {
+  const v = u?.is_deleted;
+  if (v && typeof v === "object" && Array.isArray(v.data)) {
+    return Number(v.data?.[0] ?? 0) !== 1; // Buffer style {type:'Buffer',data:[0|1]}
+  }
+  if (typeof v === "boolean") return v === false;
+  if (typeof v === "number") return v !== 1;
+  if (typeof v === "string") return v !== "1" && v.toLowerCase() !== "true";
+  return true; // treat missing flag as active
+}
+const activeUsers = computed(() =>
+    Array.isArray(users.value) ? users.value.filter(isActiveUser) : []
+);
+/* ------------------------------------------------------------------- */
+
 const scheduleByDeptId = computed(() => {
   const m = new Map();
   for (const s of schedules.value) m.set(s.department_id, s);
@@ -242,9 +258,9 @@ const onCallScheduleById = computed(() => {
 /* Determine effective schedule for a given user and date (jake-oncall) */
 function getEffectiveScheduleForDate(userId, ymd) {
   const deptSched =
-    scheduleByDeptId.value.get(
-      users.value.find((u) => u.user_id === userId)?.user_department
-    ) || null;
+      scheduleByDeptId.value.get(
+          activeUsers.value.find((u) => u.user_id === userId)?.user_department
+      ) || null;
   const rows = onCallRowsByUserId.value.get(Number(userId)) || [];
   const today = dayjs(ymd, "YYYY-MM-DD");
 
@@ -263,8 +279,8 @@ function getEffectiveScheduleForDate(userId, ymd) {
     const end = start.add(Math.max(1, span) - 1, "day"); // inclusive
 
     if (
-      (today.isAfter(start, "day") || today.isSame(start, "day")) &&
-      (today.isBefore(end, "day") || today.isSame(end, "day"))
+        (today.isAfter(start, "day") || today.isSame(start, "day")) &&
+        (today.isBefore(end, "day") || today.isSame(end, "day"))
     ) {
       return { sched: ocSched, source: "oncall", deptSched };
     }
@@ -298,8 +314,9 @@ watch([startDate, endDate], ([f, t]) => {
   if (tNew !== (endDate.value || "")) endDate.value = tNew;
 });
 
+/* ---- only ACTIVE users in the chosen department ---- */
 const employeesInDept = computed(() =>
-  users.value.filter((u) => u.user_department === deptId.value)
+    activeUsers.value.filter((u) => u.user_department === deptId.value)
 );
 
 const dateList = computed(() => {
@@ -325,37 +342,36 @@ const prettyRange = computed(() => {
 
 /* ---------- Helpers (EN/EM dash normalization) ---------- */
 function toWorkingSet(noteRaw) {
-  // Normalize both EN DASH (U+2013) and EM DASH (U+2014) to hyphen
   const normalize = (txt) =>
-    String(txt || "")
-      .replace(/[\u2013\u2014]/g, "-")
-      .trim();
-  const note = normalize(noteRaw) || "Mon-Fri"; // default if missing
+      String(txt || "")
+          .replace(/[\u2013\u2014]/g, "-")
+          .trim();
+  const note = normalize(noteRaw) || "Mon-Fri";
   const idx = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const key = (s) => String(s).slice(0, 3).toLowerCase();
   const set = new Set();
   note
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .forEach((part) => {
-      const m = part.match(/^([A-Za-z]{3,})\s*-\s*([A-Za-z]{3,})$/);
-      if (m) {
-        const a = idx[key(m[1])];
-        const b = idx[key(m[2])];
-        if (a == null || b == null) return;
-        let i = a;
-        while (true) {
-          set.add(i);
-          if (i === b) break;
-          i = (i + 1) % 7;
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .forEach((part) => {
+        const m = part.match(/^([A-Za-z]{3,})\s*-\s*([A-Za-z]{3,})$/);
+        if (m) {
+          const a = idx[key(m[1])];
+          const b = idx[key(m[2])];
+          if (a == null || b == null) return;
+          let i = a;
+          while (true) {
+            set.add(i);
+            if (i === b) break;
+            i = (i + 1) % 7;
+          }
+        } else {
+          const k = idx[key(part)];
+          if (k != null) set.add(k);
         }
-      } else {
-        const k = idx[key(part)];
-        if (k != null) set.add(k);
-      }
-    });
-  if (set.size === 0) [1, 2, 3, 4, 5].forEach((d) => set.add(d)); // Mon–Fri fallback
+      });
+  if (set.size === 0) [1, 2, 3, 4, 5].forEach((d) => set.add(d));
   return set;
 }
 
@@ -367,12 +383,10 @@ function pickTime(obj, keys) {
 function parseHM(baseDate, hm) {
   if (!hm) return null;
   const s = String(hm).trim();
-  // HH:mm or HH:mm:ss
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
     const hhmmss = /^\d{1,2}:\d{2}$/.test(s) ? s + ":00" : s;
     return dayjs(`${baseDate}T${hhmmss}`);
   }
-  // h:mm am/pm
   const m = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
   if (m) {
     let hh = parseInt(m[1], 10) % 12;
@@ -388,19 +402,15 @@ function parseHM(baseDate, hm) {
 function buildRow(u, ymd) {
   const rec = attendance.value.find((a) => a.user_id === u.user_id && a.log_date === ymd);
 
-  // Effective schedule (oncall overrides department)
   const { sched: effSched, source, deptSched } = getEffectiveScheduleForDate(
-    u.user_id,
-    ymd
+      u.user_id,
+      ymd
   );
 
-  // Working day check:
-  // - If oncall is active today => always a working day (no Rest Day)
-  // - Else use department workdays_note to determine Rest Day
   let isWorkingDay = true;
   if (source === "dept") {
     const workingSet = toWorkingSet(
-      deptSched?.workdays_note ||
+        deptSched?.workdays_note ||
         deptSched?.workdays ||
         deptSched?.work_days ||
         deptSched?.work_days_note
@@ -423,7 +433,6 @@ function buildRow(u, ymd) {
     };
   }
 
-  // Working day with no attendance -> Absent
   if (!rec || (!rec.time_in && !rec.time_out)) {
     return {
       key: `r-${u.user_id}-${ymd}`,
@@ -438,7 +447,6 @@ function buildRow(u, ymd) {
     };
   }
 
-  // Present -> compute metrics using EFFECTIVE schedule
   const expectedStart = effSched?.work_start || "08:00:00";
   const expectedEnd = effSched?.work_end || "17:00:00";
 
@@ -454,7 +462,6 @@ function buildRow(u, ymd) {
   const schedEnd = parseHM(baseDate, expectedEnd);
   const outDJ = parseHM(baseDate, rec.time_out);
 
-  /* --- Work Hours (per your rule) --- */
   let workMins = 0;
   if (schedEnd) {
     if (!outDJ && rec.time_in) {
@@ -467,7 +474,6 @@ function buildRow(u, ymd) {
     }
   }
 
-  /* --- Late (grace + lunch over 60 + break over 30) with FLOOR to avoid over a minute --- */
   const inDJ = parseHM(baseDate, rec.time_in);
   const grace = schedStart ? schedStart.add(5, "minute") : null;
   let lateFromIn = 0;
@@ -475,14 +481,13 @@ function buildRow(u, ymd) {
     lateFromIn = Math.max(0, Math.floor(inDJ.diff(grace, "second") / 60));
   }
 
-  // Lunch duration (attendance-only)
   const lunchStartDJ = parseHM(
-    baseDate,
-    pickTime(rec, ["lunch_start", "lunchStart", "lunch_in", "lunchIn"])
+      baseDate,
+      pickTime(rec, ["lunch_start", "lunchStart", "lunch_in", "lunchIn"])
   );
   const lunchEndDJ = parseHM(
-    baseDate,
-    pickTime(rec, ["lunch_end", "lunchEnd", "lunch_out", "lunchOut"])
+      baseDate,
+      pickTime(rec, ["lunch_end", "lunchEnd", "lunch_out", "lunchOut"])
   );
   let lunchExtra = 0;
   if (lunchStartDJ && lunchEndDJ && lunchEndDJ.isAfter(lunchStartDJ)) {
@@ -490,14 +495,13 @@ function buildRow(u, ymd) {
     lunchExtra = Math.max(0, dur - 60);
   }
 
-  // Break duration (attendance-only)
   const breakStartDJ = parseHM(
-    baseDate,
-    pickTime(rec, ["break_start", "breakStart", "break_in", "breakIn"])
+      baseDate,
+      pickTime(rec, ["break_start", "breakStart", "break_in", "breakIn"])
   );
   const breakEndDJ = parseHM(
-    baseDate,
-    pickTime(rec, ["break_end", "breakEnd", "break_out", "breakOut"])
+      baseDate,
+      pickTime(rec, ["break_end", "breakEnd", "break_out", "breakOut"])
   );
   let breakExtra = 0;
   if (breakStartDJ && breakEndDJ && breakEndDJ.isAfter(breakStartDJ)) {
@@ -525,17 +529,16 @@ function buildRow(u, ymd) {
 }
 
 const consistentNames = computed(() => {
-  // Present and On Time for every day in range
   const names = [];
   for (const u of employeesInDept.value) {
     const name = `${u.user_fname || ""} ${u.user_lname || ""}`.trim();
     if (!name) continue;
     const allOnTime =
-      dateList.value.length > 0 &&
-      dateList.value.every((d) => {
-        const row = buildRow(u, d);
-        return row.status === "Present" && row.punctuality === "On Time";
-      });
+        dateList.value.length > 0 &&
+        dateList.value.every((d) => {
+          const row = buildRow(u, d);
+          return row.status === "Present" && row.punctuality === "On Time";
+        });
     if (allOnTime) names.push(name);
   }
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
@@ -546,16 +549,16 @@ const groups = computed(() => {
   const needle = (q.value || "").toLowerCase();
   const list = [];
   const orderedDates = [...dateList.value].sort((a, b) =>
-    String(b).localeCompare(String(a))
+      String(b).localeCompare(String(a))
   ); // newest → oldest
   for (const ymd of orderedDates) {
     const rows = employeesInDept.value
-      .map((u) => {
-        const name = `${u.user_fname || ""} ${u.user_lname || ""}`.trim();
-        if (needle && !name.toLowerCase().includes(needle)) return null;
-        return buildRow(u, ymd);
-      })
-      .filter(Boolean);
+        .map((u) => {
+          const name = `${u.user_fname || ""} ${u.user_lname || ""}`.trim();
+          if (needle && !name.toLowerCase().includes(needle)) return null;
+          return buildRow(u, ymd);
+        })
+        .filter(Boolean);
     list.push({ ymd, rows });
   }
   return list;
@@ -563,26 +566,26 @@ const groups = computed(() => {
 
 /* ---------- Totals for KPI cards ---------- */
 const totalLateMinutes = computed(() =>
-  groups.value.reduce(
-    (sum, g) =>
-      sum +
-      g.rows.reduce(
-        (s, r) => s + (typeof r.lateMinutes === "number" ? r.lateMinutes : 0),
+    groups.value.reduce(
+        (sum, g) =>
+            sum +
+            g.rows.reduce(
+                (s, r) => s + (typeof r.lateMinutes === "number" ? r.lateMinutes : 0),
+                0
+            ),
         0
-      ),
-    0
-  )
+    )
 );
 const totalOvertimeMinutes = computed(() =>
-  groups.value.reduce(
-    (sum, g) =>
-      sum +
-      g.rows.reduce(
-        (s, r) => s + (typeof r.overtimeMinutes === "number" ? r.overtimeMinutes : 0),
+    groups.value.reduce(
+        (sum, g) =>
+            sum +
+            g.rows.reduce(
+                (s, r) => s + (typeof r.overtimeMinutes === "number" ? r.overtimeMinutes : 0),
+                0
+            ),
         0
-      ),
-    0
-  )
+    )
 );
 const totalLateHHMM = computed(() => minutesToHHMM(totalLateMinutes.value));
 const totalOvertimeHHMM = computed(() => minutesToHHMM(totalOvertimeMinutes.value));
@@ -605,7 +608,6 @@ onMounted(async () => {
 
   if (d && d.length) deptId.value = d[0].department_id;
 
-  // Ensure defaults still respect constraints on initial load
   if (dayjs(startDate.value).isBefore(minStartStr.value))
     startDate.value = minStartStr.value;
   if (dayjs(endDate.value).isAfter(yesterdayStr.value))
@@ -619,12 +621,12 @@ function computeRowStatus(r) {
   const s = (r.status || "").trim();
   if (allowed.has(s)) return s;
   const hasAttendance = !!(
-    r.time_in ||
-    r.timeIn ||
-    r.time_out ||
-    r.timeOut ||
-    r.clock_in ||
-    r.clock_out
+      r.time_in ||
+      r.timeIn ||
+      r.time_out ||
+      r.timeOut ||
+      r.clock_in ||
+      r.clock_out
   );
   return hasAttendance ? "Present" : "Absent";
 }
@@ -634,8 +636,8 @@ function printDetails() {
   try {
     const w = window.open("", "_blank");
     const content = printRef.value
-      ? printRef.value.innerHTML
-      : "<p>No records to print.</p>";
+        ? printRef.value.innerHTML
+        : "<p>No records to print.</p>";
     const title = "Department Reports";
     const dept = deptName.value || "—";
     const range = prettyRange.value;
@@ -674,10 +676,7 @@ function printDetails() {
 
 <style scoped>
 /* Page structure */
-.page {
-  display: grid;
-  gap: 12px;
-}
+.page { display: grid; gap: 12px; }
 
 /* Cards */
 .card {
@@ -689,303 +688,107 @@ function printDetails() {
 }
 
 /* Header */
-.header-card {
-  padding: 16px;
-}
+.header-card { padding: 16px; }
 .header-top {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 12px; margin-bottom: 8px;
 }
-.title {
-  font-size: 18px;
-  font-weight: 800;
-  margin: 0;
-  color: #111827;
-}
+.title { font-size: 18px; font-weight: 800; margin: 0; color: #111827; }
 .header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
 }
-
-/* Keep both the date chip and the print button compact (no stretching) */
 .header-actions .range-wrap,
-.header-actions .btn-print {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  max-width: max-content;
-  white-space: nowrap;
-}
+.header-actions .btn-print { flex: 0 0 auto !important; width: auto !important; max-width: max-content; white-space: nowrap; }
 
 .range-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  padding: 6px 10px;
-  border-radius: 999px;
-  color: #374151;
-  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #f8fafc; border: 1px solid #e5e7eb;
+  padding: 6px 10px; border-radius: 999px; color: #374151; font-weight: 600;
 }
-.range-icon {
-  font-size: 12px;
-  line-height: 1;
-}
-.range-badge {
-  font-size: 12px;
-  letter-spacing: 0.01em;
-}
+.range-icon { font-size: 12px; line-height: 1; }
+.range-badge { font-size: 12px; letter-spacing: 0.01em; }
 
 /* Button */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid #111827;
-  background: #111827;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
-  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 12px;
+  border: 1px solid #111827; background: #111827; color: #fff;
+  font-weight: 700; font-size: 12px; cursor: pointer;
   box-shadow: 0 2px 4px rgba(17, 24, 39, 0.06);
   transition: transform 0.06s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
-.btn:hover {
-  opacity: 0.96;
-  transform: translateY(-1px);
-}
-.btn:active {
-  transform: translateY(0);
-}
-.btn-icon {
-  display: block;
-}
-.btn-print {
-  padding-inline: 14px;
-}
+.btn:hover { opacity: 0.96; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-icon { display: block; }
+.btn-print { padding-inline: 14px; }
 
 /* Filters */
 .filters {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 6px;
+  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 10px; margin-top: 6px;
 }
-.field {
-  grid-column: span 3 / span 3;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field.grow {
-  grid-column: span 6 / span 6;
-}
+.field { grid-column: span 3 / span 3; display: flex; flex-direction: column; gap: 6px; }
+.field.grow { grid-column: span 6 / span 6; }
 @media (max-width: 900px) {
-  .header-top {
-    grid-template-columns: 1fr;
-  }
-  .header-actions {
-    justify-content: flex-start;
-  }
-  .field,
-  .field.grow {
-    grid-column: span 12 / span 12;
-  }
+  .header-top { grid-template-columns: 1fr; }
+  .header-actions { justify-content: flex-start; }
+  .field, .field.grow { grid-column: span 12 / span 12; }
 }
-label {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 600;
+label { font-size: 12px; color: #6b7280; font-weight: 600; }
+input, select {
+  padding: 9px 10px; border: 1px solid #e5e7eb; border-radius: 10px;
+  outline: none; font-size: 14px; background: #fff;
 }
-input,
-select {
-  padding: 9px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  outline: none;
-  font-size: 14px;
-  background: #fff;
-}
-input:focus,
-select:focus {
-  border-color: #111827;
-}
+input:focus, select:focus { border-color: #111827; }
 
 /* KPI Grid */
 .kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px; margin-top: 12px;
 }
 .kpi-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 16px; display: flex; flex-direction: column; gap: 6px; align-items: center;
 }
-.kpi-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #6b7280;
-  text-transform: uppercase;
-}
-.kpi-value {
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-}
+.kpi-label { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: #6b7280; text-transform: uppercase; }
+.kpi-value { font-size: 28px; font-weight: 800; line-height: 1; }
 
 /* Consistent section */
-.consistent {
-  margin-top: 12px;
-  border: 1px dashed #e5e7eb;
-  border-radius: 14px;
-  padding: 12px;
-  background: #fafafa;
-}
-.consistent-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.consistent-title {
-  font-weight: 700;
-  color: #374151;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.consistent-count {
-  font-size: 12px;
-  color: #6b7280;
-}
-.chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 8px;
-  max-height: 116px;
-  overflow: auto;
-}
+.consistent { margin-top: 12px; border: 1px dashed #e5e7eb; border-radius: 14px; padding: 12px; background: #fafafa; }
+.consistent-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.consistent-title { font-weight: 700; color: #374151; display: inline-flex; align-items: center; gap: 8px; }
+.consistent-count { font-size: 12px; color: #6b7280; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; max-height: 116px; overflow: auto; }
 .chip-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  font-size: 12px;
-  color: #374151;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 999px; border: 1px solid #e5e7eb; background: #fff;
+  font-size: 12px; color: #374151; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
 /* Table */
-.day-heading {
-  margin: 12px 0 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
-}
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  overflow: hidden;
-  border-radius: 12px;
-}
+.day-heading { margin: 12px 0 6px; font-size: 14px; font-weight: 700; color: #111827; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; overflow: hidden; border-radius: 12px; }
 .table thead th {
-  text-align: left;
-  background: #f8fafc;
-  color: #374151;
-  font-weight: 700;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 10px;
+  text-align: left; background: #f8fafc; color: #374151; font-weight: 700;
+  border-bottom: 1px solid #e5e7eb; padding: 10px;
 }
-.table td {
-  border-top: 1px solid #f1f5f9;
-  padding: 10px;
-  vertical-align: middle;
-}
-.table tbody tr:hover {
-  background: #fafafa;
-}
-.col-name {
-  width: 36%;
-}
-.emp-name {
-  font-weight: 600;
-  color: #111827;
-}
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
-}
+.table td { border-top: 1px solid #f1f5f9; padding: 10px; vertical-align: middle; }
+.table tbody tr:hover { background: #fafafa; }
+.col-name { width: 36%; }
+.emp-name { font-weight: 600; color: #111827; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
 
 /* Chips for statuses */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  border: 1px solid transparent;
-}
-.chip-ok {
-  background: #ecfdf5;
-  color: #065f46;
-  border-color: #a7f3d0;
-}
-.chip-warn {
-  background: #fff7ed;
-  color: #9a3412;
-  border-color: #fed7aa;
-}
-.chip-danger {
-  background: #fef2f2;
-  color: #991b1b;
-  border-color: #fecaca;
-}
-.chip-muted {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #e5e7eb;
-}
+.chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid transparent; }
+.chip-ok { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.chip-warn { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+.chip-danger { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+.chip-muted { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
 
 /* Small helpers */
-.muted {
-  color: #6b7280;
-}
-.center {
-  text-align: center;
-}
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  display: inline-block;
-}
-.dot-ok {
-  background: #10b981;
-}
-.row-consistent td {
-  background: rgba(16, 185, 129, 0.08);
-}
+.muted { color: #6b7280; }
+.center { text-align: center; }
+.dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+.dot-ok { background: #10b981; }
+.row-consistent td { background: rgba(16, 185, 129, 0.08); }
 </style>

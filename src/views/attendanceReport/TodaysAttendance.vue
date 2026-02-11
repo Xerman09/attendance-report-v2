@@ -38,9 +38,9 @@
           <select v-model.number="deptFilter">
             <option :value="0">All</option>
             <option
-              v-for="d in departments"
-              :key="d.department_id"
-              :value="d.department_id"
+                v-for="d in departments"
+                :key="d.department_id"
+                :value="d.department_id"
             >
               {{ d.department_name }}
             </option>
@@ -51,9 +51,9 @@
           <label>Search Employee</label>
           <div class="search-line">
             <input
-              class="search-input"
-              placeholder="Search by name or email"
-              v-model="q"
+                class="search-input"
+                placeholder="Search by name or email"
+                v-model="q"
             />
           </div>
         </div>
@@ -88,44 +88,44 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Schedule</th>
-              <th>Time In</th>
-              <th>Lunch Start</th>
-              <th>Lunch End</th>
-              <th>Break Start</th>
-              <th>Break End</th>
-              <th>Time Out</th>
-              <th>Punctuality</th>
-              <th>Status</th>
-            </tr>
+          <tr>
+            <th>Employee</th>
+            <th>Schedule</th>
+            <th>Time In</th>
+            <th>Lunch Start</th>
+            <th>Lunch End</th>
+            <th>Break Start</th>
+            <th>Break End</th>
+            <th>Time Out</th>
+            <th>Punctuality</th>
+            <th>Status</th>
+          </tr>
           </thead>
           <tbody>
-            <tr v-for="row in displayRows" :key="row.key">
-              <td>
-                <div class="emp">
-                  <div class="name">{{ row.empName }}</div>
-                  <div class="dept">{{ row.deptName }}</div>
-                </div>
-              </td>
-              <td>{{ row.schedule_fmt || "—" }}</td>
-              <td>{{ row.time_in_fmt || "—" }}</td>
-              <td>{{ row.lunch_start_fmt || "—" }}</td>
-              <td>{{ row.lunch_end_fmt || "—" }}</td>
-              <td>{{ row.break_start_fmt || "—" }}</td>
-              <td>{{ row.break_end_fmt || "—" }}</td>
-              <td>{{ row.time_out_fmt || "—" }}</td>
-              <td>{{ row.punctuality || "—" }}</td>
-              <td>
+          <tr v-for="row in displayRows" :key="row.key">
+            <td>
+              <div class="emp">
+                <div class="name">{{ row.empName }}</div>
+                <div class="dept">{{ row.deptName }}</div>
+              </div>
+            </td>
+            <td>{{ row.schedule_fmt || "—" }}</td>
+            <td>{{ row.time_in_fmt || "—" }}</td>
+            <td>{{ row.lunch_start_fmt || "—" }}</td>
+            <td>{{ row.lunch_end_fmt || "—" }}</td>
+            <td>{{ row.break_start_fmt || "—" }}</td>
+            <td>{{ row.break_end_fmt || "—" }}</td>
+            <td>{{ row.time_out_fmt || "—" }}</td>
+            <td>{{ row.punctuality || "—" }}</td>
+            <td>
                 <span class="chip" :class="statusChip(row.status)">
                   {{ row.status }}
                 </span>
-              </td>
-            </tr>
-            <tr v-if="displayRows.length === 0">
-              <td colspan="10">No employees match the selected filters.</td>
-            </tr>
+            </td>
+          </tr>
+          <tr v-if="displayRows.length === 0">
+            <td colspan="10">No employees match the selected filters.</td>
+          </tr>
           </tbody>
         </table>
       </div>
@@ -151,30 +151,45 @@ const departments = ref([]);
 const schedules = ref([]);
 const attendance = ref([]);
 
-/* --- NEW: on-call datasets --- */
+/* on-call datasets */
 const onCallList = ref([]);
 const onCallSchedules = ref([]);
 
 const nowTime = ref(dayjs().format("h:mm:ss A"));
 let _nowTimer;
-let _refreshTimer; // auto-refresh attendance every 60s
+let _refreshTimer;
 
 const presentFilter = ref("all");
 const punctualityFilter = ref("all");
 const deptFilter = ref(0);
 const q = ref("");
 
-// --- UI helpers
+/* -------- INACTIVE USER HANDLING -------- */
+function isActiveUser(u) {
+  const v = u?.is_deleted;
+  if (v && typeof v === "object" && Array.isArray(v.data)) {
+    // Directus Buffer style
+    return Number(v.data?.[0] ?? 0) !== 1;
+  }
+  if (typeof v === "boolean") return v === false;
+  if (typeof v === "number") return v !== 1;
+  if (typeof v === "string") return v !== "1" && v.toLowerCase() !== "true";
+  // If field missing, assume active
+  return true;
+}
+const activeUsers = computed(() => (Array.isArray(users.value) ? users.value.filter(isActiveUser) : []));
+
+/* UI helpers */
 function statusChip(s) {
   if (s === "Present") return "success";
   if (s === "Not Present") return "warn";
   if (s === "Absent") return "danger";
-  if (s === "Rest Day") return "info"; // neutral gray
+  if (s === "Rest Day") return "info";
   if (s === "On Call") return "oncall";
   return "";
 }
 
-// Pretty schedule helpers
+/* Pretty schedule helpers */
 function prettyHM(hms) {
   if (!hms) return "";
   try {
@@ -191,10 +206,10 @@ function schedulePretty(sched) {
   return `${prettyHM(start)} - ${prettyHM(end)}`;
 }
 
-// --- Indexers
+/* Indexers (built from ACTIVE users only) */
 const userById = computed(() => {
   const map = new Map();
-  for (const u of users.value) map.set(u.user_id, u);
+  for (const u of activeUsers.value) map.set(u.user_id, u);
   return map;
 });
 const departmentById = computed(() => {
@@ -208,8 +223,7 @@ const scheduleByDeptId = computed(() => {
   return map;
 });
 
-/* --- NEW: on-call lookups --- */
-/* Allow multiple on-call rows per user; store arrays */
+/* On-call lookups */
 const onCallRowsByUserId = computed(() => {
   const m = new Map();
   for (const row of onCallList.value) {
@@ -227,26 +241,16 @@ const onCallScheduleById = computed(() => {
   return m;
 });
 
-/* --- Rest Day helpers (dept schedule only) --- */
+/* Rest Day helpers */
 const DAY_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_ALIASES = {
-  sunday: "Sun",
-  sun: "Sun",
-  monday: "Mon",
-  mon: "Mon",
-  tuesday: "Tue",
-  tue: "Tue",
-  tues: "Tue",
-  wednesday: "Wed",
-  wed: "Wed",
-  thursday: "Thu",
-  thu: "Thu",
-  thur: "Thu",
-  thurs: "Thu",
-  friday: "Fri",
-  fri: "Fri",
-  saturday: "Sat",
-  sat: "Sat",
+  sunday: "Sun", sun: "Sun",
+  monday: "Mon", mon: "Mon",
+  tuesday: "Tue", tue: "Tue", tues: "Tue",
+  wednesday: "Wed", wed: "Wed",
+  thursday: "Thu", thu: "Thu", thur: "Thu", thurs: "Thu",
+  friday: "Fri", fri: "Fri",
+  saturday: "Sat", sat: "Sat",
 };
 function normDayToken(token) {
   if (!token) return "";
@@ -259,15 +263,13 @@ function parseWorkdaysNote(note) {
   if (!note || typeof note !== "string") return null;
   const days = new Set();
   const rangeRe = new RegExp(
-    "(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\\s*(?:-|–|—|to)\\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)",
-    "gi"
+      "(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\\s*(?:-|–|—|to)\\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)",
+      "gi"
   );
   note.replace(rangeRe, (_, a, b) => {
-    const A = normDayToken(a),
-      B = normDayToken(b);
+    const A = normDayToken(a), B = normDayToken(b);
     if (!A || !B) return "";
-    const ai = DAY_ORDER.indexOf(A);
-    const bi = DAY_ORDER.indexOf(B);
+    const ai = DAY_ORDER.indexOf(A), bi = DAY_ORDER.indexOf(B);
     if (ai < 0 || bi < 0) return "";
     let j = ai;
     while (true) {
@@ -277,10 +279,7 @@ function parseWorkdaysNote(note) {
     }
     return "";
   });
-  const singles = note
-    .split(/[,/&]+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
+  const singles = note.split(/[,/&]+/).map((t) => t.trim()).filter(Boolean);
   for (const tok of singles) {
     if (/(?:-|–|—|\bto\b)/i.test(tok)) continue;
     const d = normDayToken(tok);
@@ -297,15 +296,12 @@ function isRestDayForDate(schedule, isoYmd) {
   return !allowed.has(dow);
 }
 
-// --- Today helpers
+/* Today helpers */
 const todayStr = computed(() => dayjs().format("dddd - MMM D, YYYY"));
 const todayYMD = computed(() => dayjs().format("YYYY-MM-DD"));
+const todayRows = computed(() => attendance.value.filter((a) => a.log_date === todayYMD.value));
 
-const todayRows = computed(() =>
-  attendance.value.filter((a) => a.log_date === todayYMD.value)
-);
-
-/* --- NEW: effective schedule for TODAY (on-call with working_days span) --- */
+/* Effective schedule for TODAY */
 function getEffectiveScheduleForToday(userId) {
   const rows = onCallRowsByUserId.value.get(Number(userId)) || [];
   if (!rows.length) return { sched: null, source: "none" };
@@ -316,138 +312,145 @@ function getEffectiveScheduleForToday(userId) {
     const ocSched = onCallScheduleById.value.get(Number(schedId));
     if (!ocSched) continue;
 
-    const startStr = String(
-      ocSched.schedule_date ?? ocSched.date ?? ocSched.scheduleDate ?? ""
-    );
+    const startStr = String(ocSched.schedule_date ?? ocSched.date ?? ocSched.scheduleDate ?? "");
     if (!startStr) continue;
 
     const start = dayjs(startStr, "YYYY-MM-DD");
     if (!start.isValid()) continue;
 
     const spanDays = Number(ocSched.working_days ?? ocSched.workingDays ?? 1);
-    const end = start.add(Math.max(1, spanDays) - 1, "day"); // inclusive end
+    const end = start.add(Math.max(1, spanDays) - 1, "day");
 
     const today = dayjs(todayYMD.value, "YYYY-MM-DD");
-    if (
-      (today.isAfter(start, "day") || today.isSame(start, "day")) &&
-      (today.isBefore(end, "day") || today.isSame(end, "day"))
-    ) {
-      // today falls within the on-call window
+    if ((today.isAfter(start, "day") || today.isSame(start, "day")) &&
+        (today.isBefore(end, "day") || today.isSame(end, "day"))) {
       return { sched: ocSched, source: "oncall" };
     }
   }
-
   return { sched: null, source: "none" };
 }
 
-// --- Build rows (present)
+/* Build rows (present) — skip inactive users */
 const presentToday = computed(() => {
-  return todayRows.value.map((r) => {
-    const user = userById.value.get(r.user_id) || {};
-    const deptId = user.user_department || r.department_id || 0;
-    const dept = departmentById.value.get(deptId) || {};
+  return todayRows.value
+      .filter((r) => userById.value.has(r.user_id)) // only active users
+      .map((r) => {
+        const user = userById.value.get(r.user_id) || {};
+        const deptId = user.user_department || r.department_id || 0;
+        const dept = departmentById.value.get(deptId) || {};
 
-    // Effective schedule for TODAY
-    const { sched: ocSched, source } = getEffectiveScheduleForToday(r.user_id);
-    const deptSched = scheduleByDeptId.value.get(deptId) || {};
-    const effectiveSched = source === "oncall" ? ocSched : deptSched;
+        const { sched: ocSched, source } = getEffectiveScheduleForToday(r.user_id);
+        const deptSched = scheduleByDeptId.value.get(deptId) || {};
+        const effectiveSched = source === "oncall" ? ocSched : deptSched;
 
-    // Rest Day logic applies ONLY to department schedule (not when on-call overrides)
-    if (source !== "oncall" && isRestDayForDate(deptSched, todayYMD.value)) {
-      return {
-        key: String(r.log_id),
-        user_id: r.user_id,
-        empName: `${user.user_fname || ""} ${user.user_lname || ""}`.trim(),
-        deptName: dept.department_name || "",
-        schedule_fmt: schedulePretty(deptSched),
-        time_in_fmt: "",
-        lunch_start_fmt: "",
-        lunch_end_fmt: "",
-        break_start_fmt: "",
-        break_end_fmt: "",
-        time_out_fmt: "",
-        punctuality: "—",
-        status: "Rest Day",
-      };
-    }
+        if (source !== "oncall" && isRestDayForDate(deptSched, todayYMD.value)) {
+          return {
+            key: String(r.log_id),
+            user_id: r.user_id,
+            empName: `${user.user_fname || ""} ${user.user_lname || ""}`.trim(),
+            deptName: dept.department_name || "",
+            schedule_fmt: schedulePretty(deptSched),
+            time_in_fmt: "",
+            lunch_start_fmt: "",
+            lunch_end_fmt: "",
+            break_start_fmt: "",
+            break_end_fmt: "",
+            time_out_fmt: "",
+            punctuality: "—",
+            status: "Rest Day",
+          };
+        }
 
-    const expectedStart =
-      effectiveSched.work_start || effectiveSched.start_time || "09:00:00";
-    const expectedEnd = effectiveSched.work_end || effectiveSched.end_time || "18:00:00";
+        const expectedStart = effectiveSched.work_start || effectiveSched.start_time || "09:00:00";
+        const expectedEnd = effectiveSched.work_end || effectiveSched.end_time || "18:00:00";
 
-    const stat = computeStatus({
-      time_in: r.time_in,
-      time_out: r.time_out,
-      expectedStart,
-      expectedEnd,
-    });
+        const stat = computeStatus({
+          time_in: r.time_in,
+          time_out: r.time_out,
+          expectedStart,
+          expectedEnd,
+        });
 
-    const baseStatus = r.time_in ? "Present" : "Absent";
-    const finalStatus = source === "oncall" ? "On Call" : baseStatus;
-
-    return {
-      key: `p-${r.user_id}`,
-      user_id: r.user_id,
-      empName: `${user.user_fname || ""} ${user.user_lname || ""}`.trim(),
-      deptName: dept.department_name || "",
-      schedule_fmt: schedulePretty(effectiveSched),
-      time_in_fmt: fmtTime(r.time_in),
-      lunch_start_fmt: fmtTime(r.lunch_start),
-      lunch_end_fmt: fmtTime(r.lunch_end),
-      break_start_fmt: fmtTime(r.break_start),
-      break_end_fmt: fmtTime(r.break_end),
-      time_out_fmt: fmtTime(r.time_out),
-      punctuality: r.time_in ? (stat.lateMinutes > 0 ? "Late" : "On Time") : "—",
-      status: finalStatus,
-    };
-  });
-});
-
-// --- Build rows (not present)
-const notPresentToday = computed(() => {
-  const presentSet = new Set(todayRows.value.map((r) => r.user_id));
-
-  return users.value
-    .filter((u) => !presentSet.has(u.user_id))
-    .map((u) => {
-      const dept = departmentById.value.get(u.user_department) || {};
-
-      // Effective schedule for TODAY
-      const { sched: ocSched, source } = getEffectiveScheduleForToday(u.user_id);
-      const deptSched = scheduleByDeptId.value.get(u.user_department) || {};
-      const effectiveSched = source === "oncall" ? ocSched : deptSched;
-
-      // If on-call is active today, it's a working day; do NOT mark as Rest Day
-      if (source !== "oncall" && isRestDayForDate(deptSched, todayYMD.value)) {
-        return {
-          key: `np-${u.user_id}`,
-          user_id: u.user_id,
-          empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
-          deptName: dept.department_name || "",
-          schedule_fmt: schedulePretty(deptSched),
-          time_in_fmt: "",
-          lunch_start_fmt: "",
-          lunch_end_fmt: "",
-          break_start_fmt: "",
-          break_end_fmt: "",
-          time_out_fmt: "",
-          punctuality: "—",
-          status: "Rest Day",
-        };
-      }
-
-      // Not Present vs Absent → based on lunch_end (from effective schedule)
-      const lunchEnd =
-        effectiveSched.lunch_end ||
-        effectiveSched.lunchEnd ||
-        effectiveSched.lunch_end_time;
-
-      if (lunchEnd) {
-        const cutoff = dayjs(`${todayYMD.value}T${lunchEnd}`);
-        const now = dayjs();
-        const baseStatus = now.isAfter(cutoff) ? "Absent" : "Not Present";
+        const baseStatus = r.time_in ? "Present" : "Absent";
         const finalStatus = source === "oncall" ? "On Call" : baseStatus;
 
+        return {
+          key: `p-${r.user_id}`,
+          user_id: r.user_id,
+          empName: `${user.user_fname || ""} ${user.user_lname || ""}`.trim(),
+          deptName: dept.department_name || "",
+          schedule_fmt: schedulePretty(effectiveSched),
+          time_in_fmt: fmtTime(r.time_in),
+          lunch_start_fmt: fmtTime(r.lunch_start),
+          lunch_end_fmt: fmtTime(r.lunch_end),
+          break_start_fmt: fmtTime(r.break_start),
+          break_end_fmt: fmtTime(r.break_end),
+          time_out_fmt: fmtTime(r.time_out),
+          punctuality: r.time_in ? (stat.lateMinutes > 0 ? "Late" : "On Time") : "—",
+          status: finalStatus,
+        };
+      });
+});
+
+/* Build rows (not present) — iterate ACTIVE users only */
+const notPresentToday = computed(() => {
+  const presentSet = new Set(todayRows.value.map((r) => r.user_id));
+  return activeUsers.value
+      .filter((u) => !presentSet.has(u.user_id))
+      .map((u) => {
+        const dept = departmentById.value.get(u.user_department) || {};
+
+        const { sched: ocSched, source } = getEffectiveScheduleForToday(u.user_id);
+        const deptSched = scheduleByDeptId.value.get(u.user_department) || {};
+        const effectiveSched = source === "oncall" ? ocSched : deptSched;
+
+        if (source !== "oncall" && isRestDayForDate(deptSched, todayYMD.value)) {
+          return {
+            key: `np-${u.user_id}`,
+            user_id: u.user_id,
+            empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
+            deptName: dept.department_name || "",
+            schedule_fmt: schedulePretty(deptSched),
+            time_in_fmt: "",
+            lunch_start_fmt: "",
+            lunch_end_fmt: "",
+            break_start_fmt: "",
+            break_end_fmt: "",
+            time_out_fmt: "",
+            punctuality: "—",
+            status: "Rest Day",
+          };
+        }
+
+        const lunchEnd =
+            effectiveSched?.lunch_end ||
+            effectiveSched?.lunchEnd ||
+            effectiveSched?.lunch_end_time;
+
+        if (lunchEnd) {
+          const cutoff = dayjs(`${todayYMD.value}T${lunchEnd}`);
+          const now = dayjs();
+          const baseStatus = now.isAfter(cutoff) ? "Absent" : "Not Present";
+          const finalStatus = source === "oncall" ? "On Call" : baseStatus;
+
+          return {
+            key: `np-${u.user_id}`,
+            user_id: u.user_id,
+            empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
+            deptName: dept.department_name || "",
+            schedule_fmt: schedulePretty(effectiveSched),
+            time_in_fmt: "",
+            lunch_start_fmt: "",
+            lunch_end_fmt: "",
+            break_start_fmt: "",
+            break_end_fmt: "",
+            time_out_fmt: "",
+            punctuality: "—",
+            status: finalStatus,
+          };
+        }
+
+        const finalStatus = source === "oncall" ? "On Call" : "Not Present";
         return {
           key: `np-${u.user_id}`,
           user_id: u.user_id,
@@ -463,34 +466,15 @@ const notPresentToday = computed(() => {
           punctuality: "—",
           status: finalStatus,
         };
-      }
-
-      // Fallback (no lunch_end provided)
-      const finalStatus = source === "oncall" ? "On Call" : "Not Present";
-      return {
-        key: `np-${u.user_id}`,
-        user_id: u.user_id,
-        empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
-        deptName: dept.department_name || "",
-        schedule_fmt: schedulePretty(effectiveSched),
-        time_in_fmt: "",
-        lunch_start_fmt: "",
-        lunch_end_fmt: "",
-        break_start_fmt: "",
-        break_end_fmt: "",
-        time_out_fmt: "",
-        punctuality: "—",
-        status: finalStatus,
-      };
-    });
+      });
 });
 
-// --- KPI counts (only department affects these)
+/* KPI counts (use rows already filtered to active users) */
 const kpiSourceRows = computed(() => [...presentToday.value, ...notPresentToday.value]);
 const kpiFilteredRows = computed(() => {
   if (!deptFilter.value) return kpiSourceRows.value;
   return kpiSourceRows.value.filter(
-    (r) => userById.value.get(r.user_id)?.user_department === deptFilter.value
+      (r) => userById.value.get(r.user_id)?.user_department === deptFilter.value
   );
 });
 const kpiCounts = computed(() => {
@@ -499,13 +483,12 @@ const kpiCounts = computed(() => {
     present: rows.filter((r) => r.status === "Present").length,
     absent: rows.filter((r) => r.status === "Absent").length,
     restDay: rows.filter((r) => r.status === "Rest Day").length,
-    onTime: rows.filter((r) => r.status === "Present" && r.punctuality === "On Time")
-      .length,
+    onTime: rows.filter((r) => r.status === "Present" && r.punctuality === "On Time").length,
     late: rows.filter((r) => r.status === "Present" && r.punctuality === "Late").length,
   };
 });
 
-// --- Totals & display (unchanged)
+/* Totals & display */
 const absentTotal = computed(() => {
   const a1 = presentToday.value.filter((r) => r.status === "Absent").length;
   const a2 = notPresentToday.value.filter((r) => r.status === "Absent").length;
@@ -540,23 +523,23 @@ const displayRows = computed(() => {
 
   if (deptFilter.value) {
     rows = rows.filter(
-      (r) => userById.value.get(r.user_id)?.user_department === deptFilter.value
+        (r) => userById.value.get(r.user_id)?.user_department === deptFilter.value
     );
   }
 
   if (q.value) {
     const needle = q.value.toLowerCase();
     rows = rows.filter(
-      (r) =>
-        (r.empName || "").toLowerCase().includes(needle) ||
-        (r.deptName || "").toLowerCase().includes(needle) ||
-        String(r.user_id).includes(needle)
+        (r) =>
+            (r.empName || "").toLowerCase().includes(needle) ||
+            (r.deptName || "").toLowerCase().includes(needle) ||
+            String(r.user_id).includes(needle)
     );
   }
   return rows;
 });
 
-// --- Data load & auto-refresh (attendance only)
+/* Data load & auto-refresh */
 async function loadAll() {
   const [u, d, s, a, ocList, ocScheds] = await Promise.all([
     fetchUsers(),
@@ -573,12 +556,11 @@ async function loadAll() {
   onCallList.value = ocList;
   onCallSchedules.value = ocScheds;
 }
-
 async function refreshAttendance() {
   try {
     attendance.value = await fetchAttendance();
   } catch (e) {
-    // fail silently to avoid UX interruption
+    /* ignore */
   }
 }
 
@@ -635,12 +617,8 @@ onUnmounted(() => {
   margin-top: 2px;
 }
 @media (min-width: 1280px) {
-  .now-badge .time {
-    font-size: 32px;
-  }
-  .now-badge .date {
-    font-size: 16px;
-  }
+  .now-badge .time { font-size: 32px; }
+  .now-badge .date { font-size: 16px; }
 }
 
 /* --- Toolbar grid --- */
@@ -667,29 +645,10 @@ input[type="search"] {
   outline: none;
   font-size: 14px;
 }
-.search-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-@media (min-width: 1200px) {
-  .toolbar {
-    grid-template-columns: 200px 200px 220px 1fr;
-  }
-}
-@media (min-width: 768px) and (max-width: 1199.98px) {
-  .toolbar {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-@media (max-width: 767.98px) {
-  .toolbar {
-    grid-template-columns: 1fr;
-  }
-  .now-badge {
-    align-items: stretch;
-  }
-}
+.search-line { display: flex; align-items: center; gap: 10px; }
+@media (min-width: 1200px)   { .toolbar { grid-template-columns: 200px 200px 220px 1fr; } }
+@media (min-width: 768px) and (max-width: 1199.98px) { .toolbar { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 767.98px) { .toolbar { grid-template-columns: 1fr; } .now-badge { align-items: stretch; } }
 
 /* ---------- KPI (jake-UI) ---------- */
 .kpi-grid {
@@ -721,31 +680,13 @@ input[type="search"] {
   font-weight: 800;
   line-height: 1;
 }
-@media (max-width: 1100px) {
-  .kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-@media (max-width: 720px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 480px) {
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
-}
+@media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px)  { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px)  { .kpi-grid { grid-template-columns: 1fr; } }
 
 /* Table */
-.table-wrap {
-  margin-top: 10px;
-}
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
+.table-wrap { margin-top: 10px; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
 thead th {
   text-align: left;
   font-size: 12px;
@@ -760,52 +701,17 @@ tbody td {
   border-bottom: 1px solid #f0f2f5;
   font-size: 14px;
 }
-tbody tr:hover {
-  background: #fafcff;
-}
+tbody tr:hover { background: #fafcff; }
 
 /* Status chips */
-.chip {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-/* Present */
-.chip.success {
-  background: #ecfdf3;
-  color: #027a48;
-}
-/* Not Present */
-.chip.warn {
-  background: #fff6ed;
-  color: #b54708;
-}
-/* Absent */
-.chip.danger {
-  background: #fef3f2;
-  color: #b42318;
-}
-/* Rest Day — neutral gray (per your request) */
-.chip.info {
-  background: #f3f4f6;
-  color: #374151;
-}
-/* On Call */
-.chip.oncall {
-  background: #e0f2fe;
-  color: #075985;
-}
+.chip { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.chip.success { background: #ecfdf3; color: #027a48; }
+.chip.warn    { background: #fff6ed; color: #b54708; }
+.chip.danger  { background: #fef3f2; color: #b42318; }
+.chip.info    { background: #f3f4f6; color: #374151; }
+.chip.oncall  { background: #e0f2fe; color: #075985; }
 
 /* Employee cell */
-.emp .name {
-  font-weight: 600;
-  line-height: 1.2;
-}
-.emp .dept {
-  font-size: 12px;
-  color: #667085;
-  line-height: 1.2;
-}
+.emp .name { font-weight: 600; line-height: 1.2; }
+.emp .dept { font-size: 12px; color: #667085; line-height: 1.2; }
 </style>

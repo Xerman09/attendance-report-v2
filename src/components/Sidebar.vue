@@ -49,29 +49,63 @@
         >
           Summary Reports
         </router-link>
+
+        <router-link
+            class="nav-item child"
+            :class="{ active: $route.name === 'manage-attendance' }"
+            :to="{ name: 'manage-attendance' }"
+        >
+          Manage Attendance
+        </router-link>
+
+        <router-link
+            class="nav-item child"
+            :class="{ active: $route.name === 'edit-attendance' }"
+            :to="{ name: 'edit-attendance' }"
+        >
+          Edit Attendance
+        </router-link>
+                <router-link
+            class="nav-item child"
+            :class="{ active: $route.name === 'edit-employee-attendance' }"
+            :to="{ name: 'edit-employee-attendance' }"
+        >
+          Edit Employee Attendance
+        </router-link>
       </div>
 
-      <!-- Wage Management Menu -->
-      <!-- <button
+      <button
         class="nav-item parent"
         @click="toggleWageManagement"
         aria-expanded="wageManagement"
       >
         <div class="parent-title">
           <span class="parent-icon">📋</span>
-          <span>Wage Management</span>
+          <span>EDIT Attendance</span>  
         </div>
         <span class="chev" :class="{ rot: wageManagement }">▾</span>
       </button>
-      <div v-if="wageManagement" class="children">
-        <router-link
-          class="nav-item child"
-          :class="{ active: $route.name === 'employees' }"
-          :to="{ name: 'employees' }"
-        >
-          Employees
-        </router-link>
-      </div> -->
+        <div v-if="wageManagement" class="children">
+          <router-link
+            class="nav-item child"
+            :class="{ active: $route.name === 'manage-approved-attendance-employee' }"
+            :to="{ name: 'manage-approved-attendance-employee' }"
+          >
+            MANAGE APPROVED ATTENDANCE (EMPLOYEE)
+          </router-link>
+        </div> 
+        <div v-if="wageManagement" class="children">
+          <router-link
+            class="nav-item child"
+            :class="{ active: $route.name === 'manage-approved-attendance-daily' }"
+            :to="{ name: 'manage-approved-attendance-daily' }"
+          >
+            MANAGE APPROVED ATTENDANCE (DAILY)
+          </router-link>
+        </div> 
+        
+
+      
     </nav>
   </aside>
 </template>

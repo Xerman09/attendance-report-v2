@@ -1,6 +1,17 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+
 export default defineConfig({
-  plugins:[vue()],
-  server:{ port:5173, proxy:{ '/api': { target:'http://100.119.3.44:8055/', changeOrigin:true, rewrite:p=>p.replace(/^\/api/,'') } } }
+    plugins: [vue()],
+    server: {
+        host: '0.0.0.0', // 👈 allow LAN access using IP
+        port: 7777,
+        proxy: {
+            '/api': {
+                target: 'http://goatedcodoer:8091/',
+                changeOrigin: true,
+                rewrite: p => p.replace(/^\/api/, '')
+            }
+        }
+    }
 })
