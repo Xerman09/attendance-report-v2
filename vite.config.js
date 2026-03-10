@@ -6,6 +6,7 @@ export default defineConfig({
     server: {
         host: '0.0.0.0', // 👈 allow LAN access using IP
         port: 7777,
+        allowedHosts: ['msi', 'vtc'],
         proxy: {
             '/api': {
                 target: 'http://goatedcodoer:8091/',
@@ -13,5 +14,10 @@ export default defineConfig({
                 rewrite: p => p.replace(/^\/api/, '')
             }
         }
+    },
+    preview: {
+        host: '0.0.0.0',
+        port: 5173,
+        allowedHosts: ['msi', 'vtc']
     }
 })
