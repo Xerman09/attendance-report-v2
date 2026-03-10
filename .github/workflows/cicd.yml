@@ -1,0 +1,88 @@
+name: Vue CI/CD Pipeline (Multi-Folder)
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  # 1. THE BUILD CHECK
+  build:
+    name: Verify & Build Vue App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Build
+        run: npm run build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vue-dist
+          path: dist/
+
+  # 2. THE AUTOMATED DEPLOYMENT
+  deploy:
+    name: Distribute to System Folders via SSH
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vue-dist
+          path: dist/
+
+      # Step 2a: Upload to a temporary folder on your server
+      - name: Upload to Staging Folder
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "dist/"
+          # Uploads to ~/temp_attendance_build
+          target: "/home/${{ secrets.SERVER_USER }}/temp_attendance_build"
+
+      # Step 2b: Loop through the _system folders and distribute the files
+      - name: Distribute to _system folders
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            BASE_DIR="/home/${{ secrets.SERVER_USER }}/system"
+            TEMP_DIR="/home/${{ secrets.SERVER_USER }}/temp_attendance_build"
+            
+            # Loop through all directories ending in _system
+            for sys_dir in "$BASE_DIR"/*_system; do
+              # Check if the attendance-report-v2 folder exists in this system
+              if [ -d "$sys_dir/attendance-report-v2" ]; then
+                echo "Updating $sys_dir/attendance-report-v2/dist/ ..."
+                
+                # Sync the new build into the dist folder. 
+                # The --delete flag removes old compiled files that no longer exist in the new build.
+                rsync -a --delete "$TEMP_DIR/dist/" "$sys_dir/attendance-report-v2/dist/"
+              fi
+            done
+            
+            # Clean up the temporary staging folder
+            rm -rf "$TEMP_DIR"
+            echo "Deployment to all system folders complete!"

@@ -74,6 +74,19 @@
 
         <div class="controls-bottom">
           <div class="field">
+            <label>Cutoff</label>
+            <select v-model="cutoff" :disabled="!selectedEmployeeId">
+              <option value="26-10">26 - 10</option>
+              <option value="11-25">11 - 25</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Month</label>
+            <input type="month" v-model="monthPick" :disabled="!selectedEmployeeId" />
+          </div>
+
+          <div class="field">
             <label>Show Range (From)</label>
             <input type="date" v-model="dateFrom" :disabled="!selectedEmployeeId" />
           </div>
@@ -200,6 +213,7 @@ import {
   fetchAttendance,
   updateAttendanceLog,
   createAttendanceLog,
+  computeCutoffRange,
 } from "../../services/api";
 import { login, getCurrentUser, logout } from "../../services/auth";
 
@@ -319,6 +333,8 @@ function getDeptIdForUser(userId) {
 }
 
 /* ===== Date range controls (anchored to dateTo) ===== */
+const cutoff = ref("26-10");
+const monthPick = ref(dayjs().format("YYYY-MM"));
 const dateFrom = ref(dayjs().subtract(19, "day").format("YYYY-MM-DD"));
 const dateTo = ref(dayjs().format("YYYY-MM-DD"));
 const dayFilter = ref("");
@@ -564,6 +580,14 @@ watch(
     if (selectedEmployeeId.value) initEmpEditState();
   },
 );
+
+/* Update range when cutoff or month changes */
+watch([cutoff, monthPick], ([newCutoff, newMonth]) => {
+  if (!selectedEmployeeId.value) return;
+  const range = computeCutoffRange(newMonth, newCutoff);
+  dateFrom.value = range.from;
+  dateTo.value = range.to;
+});
 </script>
 
 <style scoped>
@@ -662,8 +686,8 @@ watch(
   gap: 12px;
 }
 .controls-bottom {
-  display: grid;
-  grid-template-columns: 1fr 1fr 0.7fr 1fr 0.7fr;
+  display:grid;
+  grid-template-columns: 0.8fr 1fr 1fr 1fr 0.7fr 1fr 0.7fr;
   gap: 12px;
   margin-top: 12px;
 }
