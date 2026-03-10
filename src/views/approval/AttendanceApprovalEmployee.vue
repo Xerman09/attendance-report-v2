@@ -33,7 +33,7 @@
       <div class="header-row">
         <div class="header-left">
           <h3 class="title">Attendance Approval</h3>
-          <p class="subtitle">Editable per-day approved minutes (Department #4 only)</p>
+          <p class="subtitle">Editable per-day approved minutes</p>
         </div>
 
         <div class="header-right">
@@ -50,11 +50,21 @@
       <!-- Controls -->
       <div class="controls no-print">
         <div class="controls-top">
+          <div class="field field--dept">
+            <label>Department</label>
+            <select v-model.number="selectedDepartmentId">
+              <option :value="0">All Departments</option>
+              <option v-for="d in departments" :key="d.department_id" :value="d.department_id">
+                {{ d.department_name }} ({{ d.department_id }})
+              </option>
+            </select>
+          </div>
+
           <div class="field field--employee">
-            <label>Employee (Dept 4)</label>
+            <label>Employee</label>
             <select v-model.number="selectedEmployeeId">
               <option :value="0">Select employee…</option>
-              <option v-for="u in dept4UsersFiltered" :key="u.user_id" :value="u.user_id">
+              <option v-for="u in usersFiltered" :key="u.user_id" :value="u.user_id">
                 {{ formatUserLabel(u) }}
               </option>
             </select>
@@ -104,7 +114,7 @@
 
         <div v-else-if="!selectedEmployeeId" class="empty-state">
           <div class="empty-title">Select an employee</div>
-          <div class="empty-sub">Choose an employee (department 4) to view/edit approvals.</div>
+          <div class="empty-sub">Choose a department and employee to view/edit approvals.</div>
         </div>
 
         <template v-else>
@@ -208,6 +218,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import dayjs from "dayjs";
 import {
   fetchUsers,
+  fetchDepartments,
   fetchAttendanceApprovalsByEmployeeRange,
   createAttendanceApproval,
   updateAttendanceApproval,
@@ -246,12 +257,15 @@ function handleLogout() {
   logout();
   currentUser.value = null;
   users.value = [];
+  departments.value = [];
   approvals.value = [];
+  selectedDepartmentId.value = 0;
   selectedEmployeeId.value = 0;
 }
 
 /* ================= DATA ================= */
 const users = ref([]);
+const departments = ref([]);
 const approvals = ref([]);
 const loading = ref(false);
 
@@ -260,7 +274,7 @@ const todayStr = ref(dayjs().format("dddd - MMM D, YYYY"));
 let _nowTimer;
 
 const q = ref("");
-const DEPT_ID = 4;
+const selectedDepartmentId = ref(0);
 
 /* Active detection */
 function isActiveUser(u) {
@@ -272,10 +286,14 @@ function isActiveUser(u) {
   return true;
 }
 const activeUsers = computed(() => (Array.isArray(users.value) ? users.value.filter(isActiveUser) : []));
-const dept4Users = computed(() => activeUsers.value.filter((u) => Number(u.user_department) === DEPT_ID));
 
-const dept4UsersFiltered = computed(() => {
-  let rows = dept4Users.value;
+const usersFiltered = computed(() => {
+  let rows = activeUsers.value;
+
+  if (selectedDepartmentId.value) {
+    rows = rows.filter((u) => Number(u.user_department) === selectedDepartmentId.value);
+  }
+
   if (q.value) {
     const needle = q.value.toLowerCase();
     rows = rows.filter((u) => {
@@ -297,7 +315,7 @@ function formatUserLabel(u) {
 /* Employee selection */
 const selectedEmployeeId = ref(0);
 const selectedEmployee = computed(
-  () => dept4Users.value.find((u) => Number(u.user_id) === Number(selectedEmployeeId.value)) || null,
+  () => activeUsers.value.find((u) => Number(u.user_id) === Number(selectedEmployeeId.value)) || null,
 );
 const selectedEmployeeName = computed(() => {
   const u = selectedEmployee.value;
@@ -471,7 +489,9 @@ async function saveApprovalRow(row) {
 async function bootAfterAuth() {
   loading.value = true;
   try {
-    users.value = await fetchUsers();
+    const [uList, dList] = await Promise.all([fetchUsers(), fetchDepartments()]);
+    users.value = uList;
+    departments.value = dList;
     dateTo.value = dayjs().format("YYYY-MM-DD");
     dateFrom.value = dayjs(dateTo.value).subtract(19, "day").format("YYYY-MM-DD");
   } finally {
@@ -489,6 +509,13 @@ onMounted(async () => {
 onUnmounted(() => {
   if (_nowTimer) clearInterval(_nowTimer);
 });
+
+watch(
+  () => selectedDepartmentId.value,
+  () => {
+    selectedEmployeeId.value = 0;
+  },
+);
 
 /* Load approvals on employee change */
 watch(
@@ -548,7 +575,7 @@ watch(
 
 /* Controls */
 .controls{background:#fbfdff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:12px}
-.controls-top{display:grid;grid-template-columns:1.4fr 1fr;gap:12px}
+.controls-top{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:12px}
 .controls-bottom{display:grid;grid-template-columns:1fr 1fr .7fr 1fr .7fr;gap:12px;margin-top:12px}
 @media (max-width:980px){
   .controls-top{grid-template-columns:1fr}
