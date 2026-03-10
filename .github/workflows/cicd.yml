@@ -1,4 +1,4 @@
-name: Vue CI/CD (Self-Hosted)
+name: Vue CI/CD (Multi-Build & PM2)
 
 on:
   push:
@@ -8,32 +8,41 @@ on:
 
 jobs:
   build_and_deploy:
-    # This tells GitHub to run the job ON your local Ubuntu machine
     runs-on: self-hosted
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Build Vue App
-        run: npm run build
-
-      - name: Distribute to System Folders
+      - name: Distribute, Build, and Restart
         run: |
-          # Use the actual local path on your machine
           BASE_DIR="/home/vertex-server-2/system"
           
-          # Loop through all directories ending in _system
+          # 1. Loop through all directories ending in _system
           for sys_dir in "$BASE_DIR"/*_system; do
-            if [ -d "$sys_dir/attendance-report-v2" ]; then
-              echo "Updating $sys_dir/attendance-report-v2/dist/ ..."
+            APP_PATH="$sys_dir/attendance-report-v2"
+            
+            if [ -d "$APP_PATH" ]; then
+              echo "------------------------------------------"
+              echo "Processing: $APP_PATH"
               
-              # Since we are already on the machine, we just use standard 'cp' or 'rsync'
-              # This is instant because it doesn't use the internet
-              rsync -a --delete dist/ "$sys_dir/attendance-report-v2/dist/"
+              # 2. Sync latest source code to the folder (excluding node_modules)
+              rsync -a --delete --exclude='node_modules' --exclude='.git' ./ "$APP_PATH/"
+              
+              # 3. Enter the folder and install/build
+              cd "$APP_PATH"
+              npm install
+              npm run build
+              
+              # 4. PM2 Restart
+              # This assumes your PM2 process name matches the folder name 
+              # or you have an ecosystem file. Adjust if needed.
+              # If your process names are unique, e.g., 'men2_system'
+              SYS_NAME=$(basename "$sys_dir")
+              pm2 restart "$SYS_NAME" || echo "Process $SYS_NAME not found in PM2, skipping restart."
+              
+              # Go back to the workspace root for the next loop iteration
+              cd $GITHUB_WORKSPACE
             fi
           done
-          echo "Deployment complete!"
+          echo "All systems updated and restarted!"
