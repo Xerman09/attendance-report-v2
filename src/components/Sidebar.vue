@@ -1,9 +1,9 @@
 <template>
   <aside :class="['sidebar', { open: isOpen }]">
     <div class="brand">
-      <span class="logo">M2</span>
+      <span class="logo">{{ logoText }}</span>
       <div class="brand-text">
-        <strong>Men2 Marketing</strong>
+        <strong>{{ companyName }}</strong>
         <!-- <small>Attendance Report</small> -->
       </div>
     </div>
@@ -121,8 +121,20 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 defineProps({ isOpen: { type: Boolean, default: false } });
+
+const companyName = import.meta.env.VITE_COMPANY_NAME || "Attendance Report";
+const logoText = computed(() => {
+  if (!companyName) return "AR";
+  return companyName
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 3);
+});
+
 const attendanceReport = ref(false);
 const wageManagement = ref(false);
 const toggleAttendanceReport = () => (attendanceReport.value = !attendanceReport.value);
