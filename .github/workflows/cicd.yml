@@ -24,25 +24,31 @@ jobs:
             
             if [ -d "$APP_PATH" ]; then
               echo "------------------------------------------"
-              echo "Processing: $APP_PATH"
+              # Get folder name (e.g., 'men2_system')
+              FOLDER_NAME=$(basename "$sys_dir")
               
-              # 2. Sync latest source code to the folder (excluding node_modules)
+              # Extract company name (e.g., 'men2' from 'men2_system')
+              COMPANY_NAME=$(echo "$FOLDER_NAME" | sed 's/_system//')
+              PM2_NAME="${COMPANY_NAME}-attendance-report"
+              
+              echo "Processing: $APP_PATH"
+              echo "Target PM2 Process: $PM2_NAME"
+              
+              # 2. Sync source code
               rsync -a --delete --exclude='node_modules' --exclude='.git' ./ "$APP_PATH/"
               
-              # 3. Enter the folder and install/build
+              # 3. Build and Restart
               cd "$APP_PATH"
+              
+              # Optional: use --quiet if the logs are too long
               npm install
               npm run build
               
-              # 4. PM2 Restart
-              # This assumes your PM2 process name matches the folder name 
-              # or you have an ecosystem file. Adjust if needed.
-              # If your process names are unique, e.g., 'men2_system'
-              SYS_NAME=$(basename "$sys_dir")
-              pm2 restart "$SYS_NAME" || echo "Process $SYS_NAME not found in PM2, skipping restart."
+              # 4. Restart PM2 process
+              pm2 restart "$PM2_NAME" || echo "Warning: PM2 process '$PM2_NAME' not found."
               
-              # Go back to the workspace root for the next loop iteration
+              # Return to root for next loop
               cd $GITHUB_WORKSPACE
             fi
           done
-          echo "All systems updated and restarted!"
+          echo "All systems updated successfully!"
