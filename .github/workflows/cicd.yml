@@ -24,24 +24,26 @@ jobs:
             
             if [ -d "$APP_PATH" ]; then
               echo "------------------------------------------"
-              # Get folder name (e.g., 'men2_system')
               FOLDER_NAME=$(basename "$sys_dir")
-              
-              # Extract company name (e.g., 'men2' from 'men2_system')
               COMPANY_NAME=$(echo "$FOLDER_NAME" | sed 's/_system//')
               PM2_NAME="${COMPANY_NAME}-attendance-report"
               
               echo "Processing: $APP_PATH"
-              echo "Target PM2 Process: $PM2_NAME"
               
-              # 2. Sync source code
-              rsync -a --delete --exclude='node_modules' --exclude='.git' ./ "$APP_PATH/"
+              # 2. Sync source code but EXCLUDE package.json and .env
+              # This keeps your 'start' commands and secrets safe on the server
+              rsync -a --delete \
+                --exclude='node_modules' \
+                --exclude='.git' \
+                --exclude='package.json' \
+                --exclude='.env' \
+                ./ "$APP_PATH/"
               
               # 3. Build and Restart
               cd "$APP_PATH"
               
-              # Optional: use --quiet if the logs are too long
-              npm install
+              # Since we excluded package.json, we don't run npm install 
+              # (unless you want to manually update dependencies on the server)
               npm run build
               
               # 4. Restart PM2 process
@@ -51,4 +53,4 @@ jobs:
               cd $GITHUB_WORKSPACE
             fi
           done
-          echo "All systems updated successfully!"
+          echo "Deployment complete (package.json and .env preserved)!"
