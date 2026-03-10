@@ -94,6 +94,7 @@
             MANAGE APPROVED ATTENDANCE (EMPLOYEE)
           </router-link>
         </div> 
+
         <div v-if="wageManagement" class="children">
           <router-link
             class="nav-item child"
@@ -104,6 +105,15 @@
           </router-link>
         </div> 
         
+                <div v-if="wageManagement" class="children">
+          <router-link
+            class="nav-item child"
+            :class="{ active: $route.name === 'manage-approved-attendance-cutoff' }"
+            :to="{ name: 'manage-approved-attendance-cutoff' }"
+          >
+            MANAGE APPROVED ATTENDANCE (CUTOFF)
+          </router-link>
+        </div> 
 
       
     </nav>

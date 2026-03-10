@@ -236,8 +236,7 @@ function isActiveUser(u) {
 
 const dept4Users = computed(() => {
   return (Array.isArray(users.value) ? users.value : [])
-    .filter(isActiveUser)
-    .filter((u) => Number(u.user_department) === DEPT_ID);
+    .filter(isActiveUser);
 });
 
 const approvalsByEmployeeId = computed(() => {

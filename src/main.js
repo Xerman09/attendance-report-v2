@@ -12,6 +12,7 @@ import EidtEmployeeAttendance from "./views/attendanceReport/EditEmployeeAttenda
 
 import ManageApprovedAttendanceEmployee from "./views/approval/AttendanceApprovalEmployee.vue";
 import ManageApprovedAttendanceDaily from "./views/approval/AttendanceApprovalDaily.vue";
+import ManegeAttendanceCutoffApprovalModule from "./views/approval/AttendanceCutoffApprovalModule.vue";
 
 import Employees from "./views/wageManagement/Employees.vue";
 import "./styles.css";
@@ -76,7 +77,13 @@ const routes = [
     name: "manage-approved-attendance-employee",
     meta: { title: "Manage Approved Attendance (Employee)" },
   },
-      {
+  {
+    path: "/approval/cutoff",
+    component: ManegeAttendanceCutoffApprovalModule,
+    name: "manage-approved-attendance-cutoff",
+    meta: { title: "Manage Approved Attendance (Cutoff)" },
+  },
+  {
     path: "/approval/daily",
     component: ManageApprovedAttendanceDaily,
     name: "manage-approved-attendance-daily",

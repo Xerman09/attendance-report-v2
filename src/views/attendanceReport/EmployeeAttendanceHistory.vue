@@ -5,10 +5,7 @@
       <div class="header-grid">
         <!-- Left: Back -->
         <div class="left">
-          <button
-            class="btn btn-ghost no-print"
-            @click="$router.push({ name: 'employee-reports' })"
-          >
+          <button class="btn btn-ghost no-print" @click="$router.push({ name: 'employee-reports' })">
             ← Back
           </button>
         </div>
@@ -93,11 +90,10 @@
             <option value="All">All</option>
             <option value="Present">Present</option>
             <option value="Absent">Absent</option>
-            <!-- <option value="Rest Day">Rest Day</option> -->
           </select>
         </div>
 
-        <!-- Nicely aligned Show Rest Day toggle -->
+        <!-- Show Rest Day toggle -->
         <div class="field restday-field">
           <label>&nbsp;</label>
           <label class="toggle-line">
@@ -152,32 +148,170 @@
               <th>Late</th>
               <th>Undertime</th>
               <th>Status</th>
+              <th class="no-print">Geotag</th>
             </tr>
           </thead>
+
           <tbody>
-            <tr v-for="r in displayedRows" :key="r.log_id">
-              <td>{{ r.date_fmt }}</td>
-              <td>{{ r.time_in_fmt || "-" }}</td>
-              <td>{{ r.lunch_start_fmt || "-" }}</td>
-              <td>{{ r.lunch_end_fmt || "-" }}</td>
-              <td>{{ r.break_start_fmt || "-" }}</td>
-              <td>{{ r.break_end_fmt || "-" }}</td>
-              <td>{{ r.time_out_fmt || "-" }}</td>
-              <td>{{ r.workMinutes != null ? minutesToHHMM(r.workMinutes) : "-" }}</td>
-              <td>{{ r.overtime_fmt || "-" }}</td>
-              <td>{{ r.lateMinutes != null ? minutesToHHMM(r.lateMinutes) : "-" }}</td>
-              <td>
-                {{ r.undertimeMinutes != null ? minutesToHHMM(r.undertimeMinutes) : "-" }}
-              </td>
-              <td>
-                <span class="chip" :class="statusChip(r.status)">{{ r.status }}</span>
-              </td>
-            </tr>
+            <template v-for="r in displayedRows" :key="r.log_id">
+              <tr>
+                <td>{{ r.date_fmt }}</td>
+                <td>{{ r.time_in_fmt || "-" }}</td>
+                <td>{{ r.lunch_start_fmt || "-" }}</td>
+                <td>{{ r.lunch_end_fmt || "-" }}</td>
+                <td>{{ r.break_start_fmt || "-" }}</td>
+                <td>{{ r.break_end_fmt || "-" }}</td>
+                <td>{{ r.time_out_fmt || "-" }}</td>
+                <td>{{ r.workMinutes != null ? minutesToHHMM(r.workMinutes) : "-" }}</td>
+                <td>{{ r.overtime_fmt || "-" }}</td>
+                <td>{{ r.lateMinutes != null ? minutesToHHMM(r.lateMinutes) : "-" }}</td>
+                <td>{{ r.undertimeMinutes != null ? minutesToHHMM(r.undertimeMinutes) : "-" }}</td>
+                <td>
+                  <span class="chip" :class="statusChip(r.status)">{{ r.status }}</span>
+                </td>
+
+                <!-- ✅ Miggle badge + dropdown trigger -->
+                <td class="no-print">
+                  <div class="geo-actions">
+                    <span v-if="hasGeotag(r.log_id)" class="badge-miggle">Miggle</span>
+                    <span v-else class="muted small">—</span>
+
+                    <button
+                      v-if="hasGeotag(r.log_id)"
+                      class="btn btn-ghost btn-mini"
+                      type="button"
+                      @click="toggleGeo(r.log_id)"
+                    >
+                      {{ geoOpen[String(r.log_id)] ? "Hide" : "View" }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- ✅ Dropdown preview row -->
+              <tr v-if="geoOpen[String(r.log_id)]" class="no-print">
+                <td colspan="13" class="geo-cell">
+                  <div class="geotag-panel">
+                    <div class="geotag-panel-header">
+                      <div class="panel-title">Geotag Evidence</div>
+                      <div class="panel-sub muted small">
+                        Log #{{ r.log_id }} · {{ r.date_fmt }}
+                      </div>
+                    </div>
+
+                    <!-- Time in / Time out preview -->
+                    <div class="geo-compare">
+                      <!-- TIME IN -->
+                      <div class="geo-col">
+                        <div class="geo-col-title">Time In</div>
+
+                        <div v-if="geotagPick(r.log_id, 'TIME_IN')" class="geo-stack">
+                          <div class="map-wrap">
+                            <iframe
+                              class="map-iframe"
+                              :src="mapEmbedUrl(geotagPick(r.log_id, 'TIME_IN'))"
+                              loading="lazy"
+                              referrerpolicy="no-referrer-when-downgrade"
+                            ></iframe>
+                          </div>
+
+                          <div class="img-wrap" v-if="geotagImageUrl(geotagPick(r.log_id, 'TIME_IN'))">
+                            <img
+                              :src="geotagImageUrl(geotagPick(r.log_id, 'TIME_IN'))"
+                              alt="Time In photo"
+                              class="click-zoom"
+                              @click="openZoom(geotagImageUrl(geotagPick(r.log_id, 'TIME_IN')), 'Time In')"
+                            />
+                          </div>
+                          <div v-else class="muted small">No image.</div>
+
+                          <div class="geo-meta muted small">
+                            <span>📍 {{ coordsText(geotagPick(r.log_id, 'TIME_IN')) || "No coordinates" }}</span>
+                            <span> · </span>
+                            <span>{{ prettyCapturedAt(geotagPick(r.log_id, 'TIME_IN')?.captured_at) }}</span>
+                          </div>
+                        </div>
+
+                        <div v-else class="geo-empty muted small">No Time In geotag.</div>
+                      </div>
+
+                      <!-- TIME OUT -->
+                      <div class="geo-col">
+                        <div class="geo-col-title">Time Out</div>
+
+                        <div v-if="geotagPick(r.log_id, 'TIME_OUT')" class="geo-stack">
+                          <div class="map-wrap">
+                            <iframe
+                              class="map-iframe"
+                              :src="mapEmbedUrl(geotagPick(r.log_id, 'TIME_OUT'))"
+                              loading="lazy"
+                              referrerpolicy="no-referrer-when-downgrade"
+                            ></iframe>
+                          </div>
+
+                          <div class="img-wrap" v-if="geotagImageUrl(geotagPick(r.log_id, 'TIME_OUT'))">
+                            <img
+                              :src="geotagImageUrl(geotagPick(r.log_id, 'TIME_OUT'))"
+                              alt="Time Out photo"
+                              class="click-zoom"
+                              @click="openZoom(geotagImageUrl(geotagPick(r.log_id, 'TIME_OUT')), 'Time Out')"
+                            />
+                          </div>
+                          <div v-else class="muted small">No image.</div>
+
+                          <div class="geo-meta muted small">
+                            <span>📍 {{ coordsText(geotagPick(r.log_id, 'TIME_OUT')) || "No coordinates" }}</span>
+                            <span> · </span>
+                            <span>{{ prettyCapturedAt(geotagPick(r.log_id, 'TIME_OUT')?.captured_at) }}</span>
+                          </div>
+                        </div>
+
+                        <div v-else class="geo-empty muted small">No Time Out geotag.</div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+
             <tr v-if="displayedRows.length === 0">
-              <td colspan="12" class="muted center">No records in range.</td>
+              <td colspan="13" class="muted center">No records in range.</td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ✅ Image Zoom Modal -->
+    <div v-if="zoom.open" class="zoom-overlay no-print" @click.self="closeZoom">
+      <div class="zoom-toolbar">
+        <div class="zoom-title">{{ zoom.title || "Preview" }}</div>
+        <div class="zoom-actions">
+          <button class="btn btn-ghost btn-mini" type="button" @click="zoomOut">−</button>
+          <button class="btn btn-ghost btn-mini" type="button" @click="resetZoom">Reset</button>
+          <button class="btn btn-ghost btn-mini" type="button" @click="zoomIn">+</button>
+          <button class="btn btn-ghost btn-mini" type="button" @click="closeZoom">✕</button>
+        </div>
+      </div>
+
+      <div
+        class="zoom-stage"
+        @wheel.prevent="onWheelZoom"
+        @mousedown="onDragStart"
+        @mousemove="onDragMove"
+        @mouseup="onDragEnd"
+        @mouseleave="onDragEnd"
+        @touchstart.passive="onTouchStart"
+        @touchmove.prevent="onTouchMove"
+        @touchend="onTouchEnd"
+      >
+        <img
+          class="zoom-img"
+          :src="zoom.src"
+          alt="Zoom"
+          :style="zoomImgStyle"
+          draggable="false"
+        />
       </div>
     </div>
   </section>
@@ -193,10 +327,12 @@ import {
   fetchSchedules,
   fetchAttendance,
   fetchDepartments,
-  /* NEW: on-call data sources */
   fetchOnCallList,
   fetchOnCallSchedules,
+  fetchGeotags,
+  getDirectImageUrl,
 } from "../../services/api";
+
 import {
   fmtTime,
   minutesToHHMM,
@@ -220,19 +356,13 @@ function normalizeStatus(s) {
 const displayedRows = computed(() => {
   const base = Array.isArray(rows?.value) ? rows.value : rows;
   let mapped = (base || []).map((r) => ({ ...r, status: normalizeStatus(r.status) }));
-  if (!showRestDay.value) {
-    mapped = mapped.filter((r) => r.status !== "Rest Day");
-  }
-  if (statusFilter.value !== "All") {
-    mapped = mapped.filter((r) => r.status === statusFilter.value);
-  }
+  if (!showRestDay.value) mapped = mapped.filter((r) => r.status !== "Rest Day");
+  if (statusFilter.value !== "All") mapped = mapped.filter((r) => r.status === statusFilter.value);
   return mapped;
 });
 
 function pickTime(obj, keys) {
-  for (const k of keys) {
-    if (obj && obj[k]) return obj[k];
-  }
+  for (const k of keys) if (obj && obj[k]) return obj[k];
   return null;
 }
 function prettyAnyTime(v, logDate) {
@@ -261,18 +391,17 @@ const users = ref([]);
 const schedules = ref([]);
 const attendance = ref([]);
 const departments = ref([]);
-
-/* NEW: on-call datasets */
 const onCallList = ref([]);
 const onCallSchedules = ref([]);
+
+const geotags = ref([]);
+const geoOpen = ref({}); // { [logId: string]: boolean }
 
 const fromDate = ref("");
 const toDate = ref("");
 
 const emp = computed(() => users.value.find((u) => u.user_id === userId));
-const empName = computed(() =>
-  emp.value ? `${emp.value.user_fname} ${emp.value.user_lname}` : `User #${userId}`
-);
+const empName = computed(() => (emp.value ? `${emp.value.user_fname} ${emp.value.user_lname}` : `User #${userId}`));
 
 /* Present badge styling */
 function statusChip(s) {
@@ -290,7 +419,7 @@ const schedByDept = computed(() => {
   return m;
 });
 
-/* NEW: on-call lookups */
+/* ---------- On-call lookups ---------- */
 const onCallRowsByUserId = computed(() => {
   const m = new Map();
   for (const row of onCallList.value) {
@@ -308,44 +437,34 @@ const onCallScheduleById = computed(() => {
   return m;
 });
 
-/* Determine if a given date is inside an active on-call window for the user.
-   Match by: onCallList.dept_sched_id == onCallSchedules.id
-   Window: [schedule_date, schedule_date + working_days - 1] inclusive.
-*/
 function getEffectiveScheduleForDate(userId, ymdISO, deptSched) {
   const ocRows = onCallRowsByUserId.value.get(Number(userId)) || [];
   const target = dayjs(String(ymdISO), "YYYY-MM-DD");
+
   for (const oc of ocRows) {
-    const schedId =
-      oc.dept_sched_id ?? oc.dept_schedule_id ?? oc.schedule_id ?? oc.deptSchedId;
+    const schedId = oc.dept_sched_id ?? oc.dept_schedule_id ?? oc.schedule_id ?? oc.deptSchedId;
     if (schedId == null) continue;
     const ocSched = onCallScheduleById.value.get(Number(schedId));
     if (!ocSched) continue;
 
-    const startStr =
-      ocSched.schedule_date ?? ocSched.date ?? ocSched.scheduleDate ?? ocSched.start_date;
+    const startStr = ocSched.schedule_date ?? ocSched.date ?? ocSched.scheduleDate ?? ocSched.start_date;
     if (!startStr) continue;
 
     const start = dayjs(String(startStr), "YYYY-MM-DD");
     if (!start.isValid()) continue;
 
-    const span = Math.max(
-      1,
-      Number(
-        ocSched.working_days ?? ocSched.workingDays ?? ocSched.days ?? ocSched.duration
-      ) || 1
-    );
+    const span = Math.max(1, Number(ocSched.working_days ?? ocSched.workingDays ?? ocSched.days ?? ocSched.duration) || 1);
     const end = start.add(span - 1, "day"); // inclusive
+
     if (
       target.isSame(start, "day") ||
       target.isSame(end, "day") ||
       (target.isAfter(start, "day") && target.isBefore(end, "day"))
     ) {
-      // Use on-call schedule for this date
       return { sched: ocSched, source: "oncall" };
     }
   }
-  // Default to department schedule
+
   return { sched: deptSched || {}, source: "dept" };
 }
 
@@ -354,11 +473,9 @@ const hire = computed(() => {
   return d && d.isValid() ? d : null;
 });
 
-/* ---------- Workdays parser (authoritative) ---------- */
+/* ---------- Workdays parser ---------- */
 function parseWorkingDays(note) {
-  if (!note || typeof note !== "string") {
-    return new Set([1, 2, 3, 4, 5]); // Mon–Fri default
-  }
+  if (!note || typeof note !== "string") return new Set([1, 2, 3, 4, 5]); // Mon–Fri default
   const text = note.trim().toLowerCase();
 
   const tokToIdx = (tok) => {
@@ -374,8 +491,6 @@ function parseWorkingDays(note) {
   };
 
   const working = new Set();
-
-  // Ranges like Mon–Fri, Mon-Fri, Mon — Fri
   const rangeRe = /([a-z]{3,})\s*[–—-]\s*([a-z]{3,})/gi;
   let m;
   while ((m = rangeRe.exec(text))) {
@@ -390,11 +505,11 @@ function parseWorkingDays(note) {
     }
   }
 
-  // Singles like Mon, Wed, Fri
   const singles = text
     .split(/[,/|]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+
   for (const s of singles) {
     if (/[–—-]/.test(s)) continue;
     const idx = tokToIdx(s);
@@ -405,7 +520,7 @@ function parseWorkingDays(note) {
   return working;
 }
 
-/* ---------- Row builder (with on-call override + Rest Day rule) ---------- */
+/* ---------- Rows builder ---------- */
 const rows = computed(() => {
   if (!fromDate.value || !toDate.value) return [];
   const start = dayjs(String(fromDate.value)).startOf("day");
@@ -431,10 +546,9 @@ const rows = computed(() => {
   let d = start.clone();
   const synth = [];
   const hasHire = !!hire.value;
+
   while (d.isBefore(end) || d.isSame(end, "day")) {
     const ds = d.format("YYYY-MM-DD");
-
-    // Decide effective schedule for this calendar day (on-call overrides dept)
     const { source } = getEffectiveScheduleForDate(userId, ds, deptSchedule);
 
     if (!byDate.has(ds)) {
@@ -451,14 +565,10 @@ const rows = computed(() => {
           overtimeMinutes: 0,
         });
       } else {
-        const weekday = d.day(); // 0..6
-        // If on-call is active today, it's a working day (Absent instead of Rest Day)
+        const weekday = d.day();
         const status =
-          source === "oncall"
-            ? "Absent"
-            : workingSet.has(weekday)
-            ? "Absent"
-            : "Rest Day";
+          source === "oncall" ? "Absent" : workingSet.has(weekday) ? "Absent" : "Rest Day";
+
         synth.push({
           log_id: (status === "Absent" ? "abs-" : "rest-") + ds,
           user_id: userId,
@@ -477,30 +587,19 @@ const rows = computed(() => {
 
   const merged = logs.concat(synth).map((l) => {
     const dayISO = String(l.log_date);
-    const deptSchedForRow =
-      schedByDept.value.get(l.department_id || deptId) || deptSchedule || {};
-    const { sched: effSched, source } = getEffectiveScheduleForDate(
-      userId,
-      dayISO,
-      deptSchedForRow
-    );
+    const deptSchedForRow = schedByDept.value.get(l.department_id || deptId) || deptSchedule || {};
+    const { sched: effSched, source } = getEffectiveScheduleForDate(userId, dayISO, deptSchedForRow);
 
     const expectedStart = effSched?.work_start || effSched?.start_time || "08:00:00";
     const expectedEnd = effSched?.work_end || effSched?.end_time || "17:00:00";
 
-    // --- REST DAY OVERRIDE (applies only when NOT on-call) ---
-    const weekdayIdx = dayjs(dayISO).day(); // 0..6
+    const weekdayIdx = dayjs(dayISO).day();
     const isRest = source !== "oncall" ? !workingSet.has(weekdayIdx) : false;
 
     const baseStat =
       isRest || l.status === "Rest Day" || l.status === "Prehire"
         ? { totalMinutes: 0, lateMinutes: 0, overtimeMinutes: 0, status: "Rest Day" }
-        : computeStatus({
-            time_in: l.time_in,
-            time_out: l.time_out,
-            expectedStart,
-            expectedEnd,
-          });
+        : computeStatus({ time_in: l.time_in, time_out: l.time_out, expectedStart, expectedEnd });
 
     const outPretty = isRest
       ? ""
@@ -508,18 +607,10 @@ const rows = computed(() => {
       ? fmtTime(l.time_out)
       : displayTimeOutWhenMissing({ log_date: l.log_date, expectedStart });
 
-    const lunchStartRaw = isRest
-      ? null
-      : pickTime(l, ["lunch_start", "lunchStart", "lunch_in", "lunchIn"]);
-    const lunchEndRaw = isRest
-      ? null
-      : pickTime(l, ["lunch_end", "lunchEnd", "lunch_out", "lunchOut"]);
-    const breakStartRaw = isRest
-      ? null
-      : pickTime(l, ["break_start", "breakStart", "break_in", "breakIn"]);
-    const breakEndRaw = isRest
-      ? null
-      : pickTime(l, ["break_end", "breakEnd", "break_out", "breakOut"]);
+    const lunchStartRaw = isRest ? null : pickTime(l, ["lunch_start", "lunchStart", "lunch_in", "lunchIn"]);
+    const lunchEndRaw = isRest ? null : pickTime(l, ["lunch_end", "lunchEnd", "lunch_out", "lunchOut"]);
+    const breakStartRaw = isRest ? null : pickTime(l, ["break_start", "breakStart", "break_in", "breakIn"]);
+    const breakEndRaw = isRest ? null : pickTime(l, ["break_end", "breakEnd", "break_out", "breakOut"]);
 
     function parseHM(baseDate, hm) {
       if (!hm) return null;
@@ -542,22 +633,21 @@ const rows = computed(() => {
     const schedStart = parseHM(dayISO, expectedStart);
     const schedEnd = parseHM(dayISO, expectedEnd);
 
-    // ---- LATE RULES (skipped on Rest Day) ----
+    // Late rules
     let customLateMinutes = 0;
     if (!isRest) {
       const graceTime = schedStart ? schedStart.add(5, "minute") : null;
       const actualIn =
-        parseHM(dayISO, l.time_in ? fmtTime(l.time_in) : null) ||
-        parseHM(dayISO, l.time_in);
-      if (graceTime && actualIn && actualIn.isAfter(graceTime)) {
-        customLateMinutes += actualIn.diff(graceTime, "minute");
-      }
+        parseHM(dayISO, l.time_in ? fmtTime(l.time_in) : null) || parseHM(dayISO, l.time_in);
+      if (graceTime && actualIn && actualIn.isAfter(graceTime)) customLateMinutes += actualIn.diff(graceTime, "minute");
+
       const actualLunchStart = parseHM(dayISO, lunchStartRaw);
       const actualLunchEnd = parseHM(dayISO, lunchEndRaw);
       if (actualLunchStart && actualLunchEnd) {
         const lunchDur = Math.max(0, actualLunchEnd.diff(actualLunchStart, "minute"));
         if (lunchDur > 60) customLateMinutes += lunchDur - 60;
       }
+
       const actualBreakStart = parseHM(dayISO, breakStartRaw);
       const actualBreakEnd = parseHM(dayISO, breakEndRaw);
       if (actualBreakStart && actualBreakEnd) {
@@ -566,36 +656,24 @@ const rows = computed(() => {
       }
     }
 
-    // Final status: force Rest Day only if not on-call and outside workingSet
     const finalStatus = isRest ? "Rest Day" : baseStat.status;
-    const isOff =
-      finalStatus === "Rest Day" || finalStatus === "Absent" || finalStatus === "Prehire";
+    const isOff = finalStatus === "Rest Day" || finalStatus === "Absent" || finalStatus === "Prehire";
 
     const tOutParsed = isRest
       ? null
-      : parseHM(dayISO, l.time_out ? fmtTime(l.time_out) : null) ||
-        parseHM(dayISO, l.time_out);
+      : parseHM(dayISO, l.time_out ? fmtTime(l.time_out) : null) || parseHM(dayISO, l.time_out);
 
-    // Undertime (skip on Rest Day)
     let undertimeMinutesFinal = null;
     if (!isOff) {
-      if (schedEnd && tOutParsed && tOutParsed.isBefore(schedEnd)) {
-        undertimeMinutesFinal = schedEnd.diff(tOutParsed, "minute");
-      } else {
-        undertimeMinutesFinal = 0;
-      }
+      if (schedEnd && tOutParsed && tOutParsed.isBefore(schedEnd)) undertimeMinutesFinal = schedEnd.diff(tOutParsed, "minute");
+      else undertimeMinutesFinal = 0;
     }
 
-    // Work hours (skip on Rest Day)
     let workMinutesFinal = null;
     if (!isOff) {
       if (tOutParsed && schedStart && schedEnd) {
         if (tOutParsed.isBefore(schedEnd)) {
-          // keep your existing rule in this view
-          workMinutesFinal = Math.max(
-            0,
-            Math.min(tOutParsed.diff(schedStart, "minute") - 60, 480)
-          );
+          workMinutesFinal = Math.max(0, Math.min(tOutParsed.diff(schedStart, "minute") - 60, 480));
         } else {
           workMinutesFinal = 480;
         }
@@ -611,36 +689,16 @@ const rows = computed(() => {
       ...l,
       date_fmt: dayjs(String(l.log_date)).format("MMM D, YYYY"),
       time_in_fmt: isOff ? "" : fmtTime(l.time_in),
-      lunch_start_fmt: isOff
-        ? ""
-        : lunchStartRaw
-        ? prettyAnyTime(lunchStartRaw, l.log_date)
-        : "",
-      lunch_end_fmt: isOff
-        ? ""
-        : lunchEndRaw
-        ? prettyAnyTime(lunchEndRaw, l.log_date)
-        : "",
-      break_start_fmt: isOff
-        ? ""
-        : breakStartRaw
-        ? prettyAnyTime(breakStartRaw, l.log_date)
-        : "",
-      break_end_fmt: isOff
-        ? ""
-        : breakEndRaw
-        ? prettyAnyTime(breakEndRaw, l.log_date)
-        : "",
+      lunch_start_fmt: isOff ? "" : lunchStartRaw ? prettyAnyTime(lunchStartRaw, l.log_date) : "",
+      lunch_end_fmt: isOff ? "" : lunchEndRaw ? prettyAnyTime(lunchEndRaw, l.log_date) : "",
+      break_start_fmt: isOff ? "" : breakStartRaw ? prettyAnyTime(breakStartRaw, l.log_date) : "",
+      break_end_fmt: isOff ? "" : breakEndRaw ? prettyAnyTime(breakEndRaw, l.log_date) : "",
       time_out_fmt: isOff ? "" : outPretty,
       workMinutes: workMinutesFinal,
       lateMinutes: isOff ? null : customLateMinutes,
       undertimeMinutes: isOff ? null : undertimeMinutesFinal,
       overtimeMinutes: isOff ? null : baseStat.overtimeMinutes,
-      overtime_fmt: isOff
-        ? ""
-        : (baseStat.overtimeMinutes || 0) >= 90
-        ? minutesToHHMM(baseStat.overtimeMinutes)
-        : "0",
+      overtime_fmt: isOff ? "" : (baseStat.overtimeMinutes || 0) >= 90 ? minutesToHHMM(baseStat.overtimeMinutes) : "0",
       status: finalStatus,
     };
   });
@@ -650,64 +708,15 @@ const rows = computed(() => {
 });
 
 /* ---------- KPIs ---------- */
-const presentCount = computed(
-  () =>
-    rows.value.filter(
-      (r) => r.status !== "Absent" && r.status !== "Rest Day" && r.status !== "Prehire"
-    ).length
-);
-const absentCount = computed(
-  () => rows.value.filter((r) => r.status === "Absent").length
-);
-const restCount = computed(
-  () => rows.value.filter((r) => r.status === "Rest Day").length
-);
-
-const lateDays = computed(
-  () =>
-    rows.value.filter(
-      (r) =>
-        (r.lateMinutes || 0) > 0 &&
-        r.status !== "Absent" &&
-        r.status !== "Rest Day" &&
-        r.status !== "Prehire"
-    ).length
-);
-const otDays = computed(
-  () =>
-    rows.value.filter(
-      (r) =>
-        (r.overtimeMinutes || 0) > 0 &&
-        r.status !== "Absent" &&
-        r.status !== "Rest Day" &&
-        r.status !== "Prehire"
-    ).length
-);
-
 const totalDaysAttended = computed(
-  () =>
-    rows.value.filter(
-      (r) => r.status !== "Absent" && r.status !== "Rest Day" && r.status !== "Prehire"
-    ).length
+  () => rows.value.filter((r) => r.status !== "Absent" && r.status !== "Rest Day" && r.status !== "Prehire").length
 );
-const totalDaysAbsent = computed(
-  () => rows.value.filter((r) => r.status === "Absent").length
-);
+const totalDaysAbsent = computed(() => rows.value.filter((r) => r.status === "Absent").length);
 
-const lateTotal = computed(() =>
-  rows.value.reduce((acc, r) => acc + (r.lateMinutes || 0), 0)
-);
-const otTotal = computed(() =>
-  rows.value.reduce((acc, r) => acc + (r.overtimeMinutes || 0), 0)
-);
-const totalWorkHoursHHMM = computed(() =>
-  minutesToHHMM(rows.value.reduce((sum, r) => sum + (r.workMinutes || 0), 0))
-);
+const lateTotal = computed(() => rows.value.reduce((acc, r) => acc + (r.lateMinutes || 0), 0));
+const otTotal = computed(() => rows.value.reduce((acc, r) => acc + (r.overtimeMinutes || 0), 0));
 
-const latePretty = computed(() => minutesPrettyWithTotal(lateTotal.value));
-const lateHHMM = computed(() => minutesToHHMM(lateTotal.value));
-const otPretty = computed(() => minutesPrettyWithTotal(otTotal.value));
-const otHHMM = computed(() => minutesToHHMM(otTotal.value));
+const totalWorkHoursHHMM = computed(() => minutesToHHMM(rows.value.reduce((sum, r) => sum + (r.workMinutes || 0), 0)));
 const totalOvertimeHHMM = computed(() => minutesToHHMM(otTotal.value));
 const totalLateHHMM = computed(() => minutesToHHMM(lateTotal.value));
 
@@ -719,15 +728,14 @@ const deptMap = computed(() => {
   for (const d of departments.value) m.set(d.department_id, d.department_name);
   return m;
 });
-const empDeptName = computed(() =>
-  emp.value ? deptMap.value.get(emp.value.user_department) || "" : ""
-);
+const empDeptName = computed(() => (emp.value ? deptMap.value.get(emp.value.user_department) || "" : ""));
 
 const empDeptSchedule = computed(() => {
   const deptId = emp.value?.user_department;
   if (!deptId) return null;
   return schedules.value.find((s) => s.department_id === deptId) || null;
 });
+
 function prettyHHMM(hms) {
   if (!hms) return "";
   try {
@@ -745,38 +753,21 @@ const empDeptSchedulePretty = computed(() => {
   return `${prettyHHMM(start)} - ${prettyHHMM(end)}`;
 });
 
-/* Workdays pretty (e.g., Mon–Fri -> Monday - Friday) */
-const FULL = {
-  Sun: "Sunday",
-  Mon: "Monday",
-  Tue: "Tuesday",
-  Wed: "Wednesday",
-  Thu: "Thursday",
-  Fri: "Friday",
-  Sat: "Saturday",
-};
+/* Workdays pretty */
+const FULL = { Sun: "Sunday", Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday" };
 const empDeptWorkdaysPretty = computed(() => {
   const note = empDeptSchedule.value?.workdays_note || "";
   if (!note) return "";
   const m = note.match(/([A-Za-z]{3,})\s*[–—-]\s*([A-Za-z]{3,})/);
   if (m) {
     const a = (m[1] || "").slice(0, 3).toLowerCase();
-    a;
     const b = (m[2] || "").slice(0, 3).toLowerCase();
-    const map = {
-      sun: "Sun",
-      mon: "Mon",
-      tue: "Tue",
-      wed: "Wed",
-      thu: "Thu",
-      fri: "Fri",
-      sat: "Sat",
-    };
+    const map = { sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat" };
     const A = FULL[map[a]] || m[1];
     const B = FULL[map[b]] || m[2];
     return `${A} - ${B}`;
   }
-  const map = { sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Sat" };
+  const map = { sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat" };
   const parts = note
     .split(/[,\s/|]+/)
     .map((t) => t.trim())
@@ -785,13 +776,11 @@ const empDeptWorkdaysPretty = computed(() => {
   return fulls.join(", ");
 });
 
-/* ---------- Print (KPI as text, not cards) ---------- */
+/* ---------- Print ---------- */
 const printDetails = () => {
   try {
     const tbl = document.querySelector(".table");
-    const tableHTML = tbl
-      ? tbl.outerHTML
-      : "<p>No attendance details available to print.</p>";
+    const tableHTML = tbl ? tbl.outerHTML : "<p>No attendance details available to print.</p>";
 
     const empN = empName?.value ?? "";
     const pos = empPosition?.value ?? "";
@@ -810,16 +799,14 @@ const printDetails = () => {
       </div>`;
 
     const w = window.open("", "_blank");
-    w.document
-      .write(`<!doctype html><html><head><meta charset="utf-8"><title>Attendance - ${empN}</title>
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Attendance - ${empN}</title>
       <style>
         *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
         body{padding:18px;color:#111827}
         h1{font-size:18px;margin:0 0 4px}
         h2{font-size:14px;margin:0;color:#374151}
         .meta{margin:10px 0 12px;font-size:12px;color:#374151}
-        .kpi-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;
-          font-size:13px;margin:8px 0 16px}
+        .kpi-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;font-size:13px;margin:8px 0 16px}
         .kpi-lines div{padding:6px 8px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa}
         table{width:100%;border-collapse:collapse;font-size:12px}
         th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}
@@ -829,9 +816,7 @@ const printDetails = () => {
       <h1>Employee Attendance</h1>
       <h2>${empN}${pos ? " — " + pos : ""}</h2>
       <div class="meta">
-        ${dept ? "Department: " + dept + " · " : ""}${
-      sched ? "Schedule: " + sched + " · " : ""
-    }${workdays ? "Workdays: " + workdays + " · " : ""}Range: ${range}
+        ${dept ? "Department: " + dept + " · " : ""}${sched ? "Schedule: " + sched + " · " : ""}${workdays ? "Workdays: " + workdays + " · " : ""}Range: ${range}
       </div>
       ${kpiText}
       ${tableHTML}
@@ -848,21 +833,23 @@ const printDetails = () => {
 const quickSelect = ref("");
 
 onMounted(async () => {
-  const [u, s, a, d, ocList, ocScheds] = await Promise.all([
+  const [u, s, a, d, ocList, ocScheds, g] = await Promise.all([
     fetchUsers(),
     fetchSchedules(),
     fetchAttendance(),
     fetchDepartments(),
-    /* NEW: on-call data */
     fetchOnCallList(),
     fetchOnCallSchedules(),
+    fetchGeotags(),
   ]);
+
   users.value = u;
   schedules.value = s;
   attendance.value = a;
   departments.value = d;
   onCallList.value = ocList;
   onCallSchedules.value = ocScheds;
+  geotags.value = g;
 
   const y = dayjs().subtract(1, "day");
   toDate.value = y.format("YYYY-MM-DD");
@@ -873,6 +860,7 @@ function applyQuickDropdown() {
   const v = String(quickSelect.value || "");
   const min = dayjs(minStartStr.value);
   const y = dayjs(yesterdayStr.value);
+
   if (v === "0") {
     fromDate.value = y.format("YYYY-MM-DD");
     toDate.value = y.format("YYYY-MM-DD");
@@ -905,7 +893,12 @@ watch([fromDate, toDate], ([f, t]) => {
   if (tNew !== (toDate.value || "")) toDate.value = tNew;
 });
 
-/* ---------- UI bits ---------- */
+/* ---------- User image ---------- */
+const empImage = computed(() => {
+  const imageId = emp.value?.user_image;
+  return getDirectImageUrl(imageId);
+});
+
 const initials = computed(() => {
   const f = (emp.value?.user_fname || "").trim();
   const l = (emp.value?.user_lname || "").trim();
@@ -913,7 +906,233 @@ const initials = computed(() => {
   const li = l ? l[0].toUpperCase() : "";
   return fi + li || "—";
 });
-const empImage = computed(() => emp.value?.user_image || "");
+
+/* ---------- Geotag helpers ---------- */
+const geotagsByLogId = computed(() => {
+  const m = new Map();
+  for (const g of geotags.value || []) {
+    const id = g.log_id;
+    if (id == null) continue;
+    const key = String(id);
+    if (!m.has(key)) m.set(key, []);
+    m.get(key).push(g);
+  }
+  return m;
+});
+
+function geotagsForLog(logId) {
+  return geotagsByLogId.value.get(String(logId)) || [];
+}
+
+function hasGeotag(logId) {
+  return geotagsForLog(logId).length > 0;
+}
+
+function toggleGeo(logId) {
+  const k = String(logId);
+  geoOpen.value = { ...geoOpen.value, [k]: !geoOpen.value[k] };
+}
+
+function coordsOf(g) {
+  const c = g?.position?.coordinates;
+  if (!Array.isArray(c) || c.length < 2) return null;
+  const lng = Number(c[0]);
+  const lat = Number(c[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+function coordsText(g) {
+  const p = coordsOf(g);
+  return p ? `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}` : "";
+}
+function prettyCapturedAt(v) {
+  if (!v) return "";
+  const d = dayjs(String(v));
+  return d.isValid() ? d.format("MMM D, YYYY h:mma") : String(v);
+}
+
+function geotagPick(logId, kind) {
+  const arr = geotagsForLog(logId);
+  if (!arr.length) return null;
+
+  const filtered = arr.filter(
+    (g) => String(g.kind || "").toUpperCase() === String(kind).toUpperCase()
+  );
+  if (!filtered.length) return null;
+
+  filtered.sort((a, b) => {
+    const ad = String(a.captured_at || "");
+    const bd = String(b.captured_at || "");
+    if (ad && bd) return bd.localeCompare(ad);
+    return Number(b.geotag_id || 0) - Number(a.geotag_id || 0);
+  });
+
+  return filtered[0];
+}
+
+function mapEmbedUrl(g) {
+  const p = coordsOf(g);
+  if (!p) return "";
+  const q = encodeURIComponent(`${p.lat},${p.lng}`);
+  return `https://maps.google.com/maps?q=${q}&z=16&output=embed`;
+}
+
+/**
+ * Geotag image:
+ * - If image_path is a Directus file ID, this will work: /api/assets/:id?access_token=TOKEN
+ * - If image_path is a filename, it will still try (some setups accept it).
+ */
+function geotagImageUrl(g) {
+  const id = g?.image_path;
+  if (!id || id === "null" || id === "undefined") return null;
+  // This matches your working browser-side image logic: access_token in query
+  return `/api/assets/${encodeURIComponent(String(id))}?access_token=rTilKSsclzuQW8WfQWK1ba8wrD_LetNn`;
+}
+
+/* ---------- Zoom modal (click to zoom) ---------- */
+const zoom = ref({
+  open: false,
+  src: "",
+  title: "",
+  scale: 1,
+  x: 0,
+  y: 0,
+  dragging: false,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  touchDist: 0,
+});
+
+const zoomImgStyle = computed(() => ({
+  transform: `translate(${zoom.value.x}px, ${zoom.value.y}px) scale(${zoom.value.scale})`,
+}));
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function onZoomKeydown(e) {
+  if (e.key === "Escape") closeZoom();
+}
+
+function openZoom(src, title = "") {
+  if (!src) return;
+  zoom.value.open = true;
+  zoom.value.src = src;
+  zoom.value.title = title;
+  zoom.value.scale = 1;
+  zoom.value.x = 0;
+  zoom.value.y = 0;
+  zoom.value.dragging = false;
+  window.addEventListener("keydown", onZoomKeydown);
+}
+
+function closeZoom() {
+  zoom.value.open = false;
+  zoom.value.src = "";
+  zoom.value.title = "";
+  zoom.value.dragging = false;
+  window.removeEventListener("keydown", onZoomKeydown);
+}
+
+function zoomIn() {
+  zoom.value.scale = clamp(zoom.value.scale + 0.2, 1, 6);
+}
+function zoomOut() {
+  zoom.value.scale = clamp(zoom.value.scale - 0.2, 1, 6);
+  if (zoom.value.scale === 1) {
+    zoom.value.x = 0;
+    zoom.value.y = 0;
+  }
+}
+function resetZoom() {
+  zoom.value.scale = 1;
+  zoom.value.x = 0;
+  zoom.value.y = 0;
+}
+
+function onWheelZoom(e) {
+  const delta = e.deltaY > 0 ? -0.15 : 0.15;
+  zoom.value.scale = clamp(zoom.value.scale + delta, 1, 6);
+  if (zoom.value.scale === 1) {
+    zoom.value.x = 0;
+    zoom.value.y = 0;
+  }
+}
+
+function onDragStart(e) {
+  if (!zoom.value.open) return;
+  if (zoom.value.scale <= 1) return;
+  zoom.value.dragging = true;
+  zoom.value.startX = e.clientX;
+  zoom.value.startY = e.clientY;
+  zoom.value.lastX = zoom.value.x;
+  zoom.value.lastY = zoom.value.y;
+}
+function onDragMove(e) {
+  if (!zoom.value.dragging) return;
+  const dx = e.clientX - zoom.value.startX;
+  const dy = e.clientY - zoom.value.startY;
+  zoom.value.x = zoom.value.lastX + dx;
+  zoom.value.y = zoom.value.lastY + dy;
+}
+function onDragEnd() {
+  zoom.value.dragging = false;
+}
+
+function dist(a, b) {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function onTouchStart(e) {
+  if (!zoom.value.open) return;
+  const t = e.touches;
+  if (t.length === 1 && zoom.value.scale > 1) {
+    zoom.value.dragging = true;
+    zoom.value.startX = t[0].clientX;
+    zoom.value.startY = t[0].clientY;
+    zoom.value.lastX = zoom.value.x;
+    zoom.value.lastY = zoom.value.y;
+  } else if (t.length === 2) {
+    zoom.value.dragging = false;
+    zoom.value.touchDist = dist(t[0], t[1]);
+  }
+}
+function onTouchMove(e) {
+  if (!zoom.value.open) return;
+  const t = e.touches;
+
+  // Pan
+  if (t.length === 1 && zoom.value.dragging && zoom.value.scale > 1) {
+    const dx = t[0].clientX - zoom.value.startX;
+    const dy = t[0].clientY - zoom.value.startY;
+    zoom.value.x = zoom.value.lastX + dx;
+    zoom.value.y = zoom.value.lastY + dy;
+    return;
+  }
+
+  // Pinch zoom
+  if (t.length === 2) {
+    const d = dist(t[0], t[1]);
+    const ratio = d / (zoom.value.touchDist || d);
+    const nextScale = clamp(zoom.value.scale * ratio, 1, 6);
+    zoom.value.scale = nextScale;
+    zoom.value.touchDist = d;
+
+    if (zoom.value.scale === 1) {
+      zoom.value.x = 0;
+      zoom.value.y = 0;
+    }
+  }
+}
+function onTouchEnd() {
+  zoom.value.dragging = false;
+  zoom.value.touchDist = 0;
+}
 </script>
 
 <style scoped>
@@ -1008,6 +1227,11 @@ const empImage = computed(() => emp.value?.user_image || "");
 }
 .btn-print {
   padding-inline: 14px;
+}
+.btn-mini {
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
 }
 
 /* Range badge */
@@ -1185,7 +1409,7 @@ select:focus {
   line-height: 1;
 }
 
-/* Table (uniform font) */
+/* Table */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -1250,5 +1474,157 @@ select:focus {
 }
 .center {
   text-align: center;
+}
+
+/* ✅ Miggle badge + actions */
+.geo-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.badge-miggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+}
+
+/* ✅ Geotag dropdown panel */
+.geo-cell {
+  background: #fff;
+  padding: 12px;
+}
+.geotag-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+.geotag-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.panel-title {
+  font-weight: 900;
+  color: #111827;
+}
+.panel-sub {
+  white-space: nowrap;
+}
+
+/* ✅ 2-column TIME IN / TIME OUT preview */
+.geo-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.geo-col {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+.geo-col-title {
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 10px;
+}
+.geo-stack {
+  display: grid;
+  gap: 10px;
+}
+.map-wrap {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+}
+.map-iframe {
+  width: 100%;
+  height: 220px;
+  border: 0;
+  display: block;
+}
+.img-wrap img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  display: block;
+}
+.geo-meta {
+  line-height: 1.4;
+}
+.geo-empty {
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px dashed #e5e7eb;
+}
+@media (max-width: 900px) {
+  .geo-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ✅ click to zoom */
+.click-zoom {
+  cursor: zoom-in;
+}
+
+/* ✅ fullscreen zoom modal */
+.zoom-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.72);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  z-index: 9999;
+}
+.zoom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+}
+.zoom-title {
+  font-weight: 900;
+  color: #111827;
+}
+.zoom-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.zoom-stage {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  cursor: grab;
+}
+.zoom-stage:active {
+  cursor: grabbing;
+}
+.zoom-img {
+  max-width: 92vw;
+  max-height: 82vh;
+  user-select: none;
+  -webkit-user-drag: none;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  transform-origin: center center;
 }
 </style>
