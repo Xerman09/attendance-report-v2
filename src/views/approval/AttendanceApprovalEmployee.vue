@@ -222,6 +222,7 @@ import {
   fetchAttendanceApprovalsByEmployeeRange,
   createAttendanceApproval,
   updateAttendanceApproval,
+  buildDateList,
 } from "../../services/api";
 import { login, getCurrentUser, logout } from "../../services/auth";
 
@@ -338,21 +339,6 @@ function clearDayFilter() {
 }
 const effectiveFrom = computed(() => dateFrom.value);
 const effectiveTo = computed(() => dateTo.value);
-
-/* Build inclusive date list */
-function buildDateList(fromYmd, toYmd) {
-  const out = [];
-  let cur = dayjs(fromYmd);
-  const end = dayjs(toYmd);
-  if (!cur.isValid() || !end.isValid()) return out;
-  if (cur.isAfter(end)) return out;
-
-  while (cur.isSame(end) || cur.isBefore(end)) {
-    out.push(cur.format("YYYY-MM-DD"));
-    cur = cur.add(1, "day");
-  }
-  return out;
-}
 
 /* Load approvals for employee + range */
 async function loadApprovals() {
