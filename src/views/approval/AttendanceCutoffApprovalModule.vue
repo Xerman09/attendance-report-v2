@@ -287,7 +287,6 @@ import {
   updateAttendanceLog,
   computeCutoffRange,
   computeApprovalMinutes,
-  buildDateList,
 } from "../../services/api";
 
 /* ================= LOGIN ================= */
@@ -448,6 +447,18 @@ function resetRowEdits(r) {
   };
 }
 
+function buildDateList(fromYmd, toYmd) {
+  const out = [];
+  let cur = dayjs(fromYmd);
+  const end = dayjs(toYmd);
+  if (!cur.isValid() || !end.isValid()) return out;
+  if (cur.isAfter(end)) return out;
+  while (cur.isSame(end) || cur.isBefore(end)) {
+    out.push(cur.format("YYYY-MM-DD"));
+    cur = cur.add(1, "day");
+  }
+  return out;
+}
 
 /* ================= FORMATTERS ================= */
 function toHHmm(t) {

@@ -275,18 +275,3 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow) => {
     overtime_minutes: 0,
   };
 };
-
-/**
- * Builds an array of "YYYY-MM-DD" strings between start and end inclusive.
- */
-export function buildDateList(startStr, endStr) {
-  const out = [];
-  if (!startStr || !endStr) return out;
-  let cur = dayjs(startStr);
-  const end = dayjs(endStr);
-  while (cur.isSame(end) || cur.isBefore(end)) {
-    out.push(cur.format("YYYY-MM-DD"));
-    cur = cur.add(1, "day");
-  }
-  return out;
-}

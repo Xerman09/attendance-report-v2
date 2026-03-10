@@ -127,7 +127,6 @@
         </div>
 
         <template v-else>
-          <!-- Metadata -->
           <div class="emp-meta">
             <div class="emp-meta__name">{{ selectedEmployeeName }}</div>
             <div class="emp-meta__sub">
@@ -139,7 +138,21 @@
             </div>
           </div>
 
-          <table v-if="dateRows.length > 0">
+          <!-- Create record on a specific day if missing -->
+          <div v-if="selectedEmployeeId && dayFilter && dayMissing" class="inline-note no-print">
+            <div class="inline-note__text">
+              No attendance record found for <b>{{ dayFilter }}</b>.
+            </div>
+            <button
+              class="btn btn-add"
+              :disabled="creatingDayRecord"
+              @click="createRecordForDay(dayFilter)"
+            >
+              {{ creatingDayRecord ? "Creating..." : "Create record" }}
+            </button>
+          </div>
+
+          <table v-if="visibleRecords.length > 0">
             <thead>
               <tr>
                 <th style="min-width:130px">Date</th>
@@ -155,16 +168,12 @@
 
             <tbody>
               <tr
-                v-for="r in dateRows"
+                v-for="r in visibleRecords"
                 :key="r._key"
-                :class="{
-                  'row-highlight': r._key === highlightedKey || r.log_date === dayFilter,
-                  'row-missing': r.isMissing
-                }"
+                :class="{ 'row-highlight': r._key === highlightedKey }"
               >
                 <td>
                   <div class="date-chip">{{ r.log_date }}</div>
-                  <div v-if="r.isMissing" class="mini-missing">missing</div>
                 </td>
 
                 <td><input type="time" step="60" v-model="empEdit[r._key].time_in" /></td>
@@ -176,10 +185,10 @@
 
                 <td class="actions">
                   <button class="btn btn-save" :disabled="empSaving[r._key]" @click="saveRecord(r)">
-                    {{ empSaving[r._key] ? "Saving..." : (r.isMissing ? "Create & Save" : "Save") }}
+                    {{ empSaving[r._key] ? "Saving..." : "Save" }}
                   </button>
                   <button class="btn btn-ghost" :disabled="empSaving[r._key]" @click="resetRecord(r)">
-                    {{ r.isMissing ? "Clear" : "Cancel" }}
+                    Cancel
                   </button>
                 </td>
               </tr>
@@ -205,7 +214,6 @@ import {
   updateAttendanceLog,
   createAttendanceLog,
   computeCutoffRange,
-  buildDateList,
 } from "../../services/api";
 import { login, getCurrentUser, logout } from "../../services/auth";
 
@@ -348,59 +356,51 @@ function inRange(d, from, to) {
   return d >= from && d <= to;
 }
 
-/* Records map for efficient lookup */
-const attendanceByDate = computed(() => {
-  const m = new Map();
-  if (!selectedEmployeeId.value) return m;
-  for (const a of attendance.value) {
-    if (Number(a.user_id) === Number(selectedEmployeeId.value)) {
-      m.set(String(a.log_date), a);
-    }
-  }
-  return m;
+/* ===== Records for employee ===== */
+const employeeRecords = computed(() => {
+  if (!selectedEmployeeId.value) return [];
+
+  const rows = attendance.value
+    .filter((a) => Number(a.user_id) === Number(selectedEmployeeId.value))
+    .map((a) => {
+      const id = a.log_id ?? a.id;
+      return { ...a, _id: id, _key: `log-${id}` };
+    });
+
+  rows.sort((a, b) => String(b.log_date).localeCompare(String(a.log_date)));
+  return rows;
 });
 
-/* Comprehensive date rows */
-const dateRows = computed(() => {
-  if (!selectedEmployeeId.value) return [];
-  const dates = buildDateList(effectiveFrom.value, effectiveTo.value);
-
-  return dates.map((d) => {
-    const a = attendanceByDate.value.get(d);
-    if (!a) {
-      return {
-        _key: `missing-${d}`,
-        isMissing: true,
-        log_date: d,
-        time_in: null,
-        lunch_start: null,
-        lunch_end: null,
-        break_start: null,
-        break_end: null,
-        time_out: null,
-      };
-    }
-    const id = a.log_id ?? a.id;
-    return {
-      ...a,
-      _id: id,
-      _key: `log-${id}`,
-      isMissing: false,
-    };
-  });
+/* Always show range list */
+const visibleRecords = computed(() => {
+  const rows = employeeRecords.value;
+  const from = effectiveFrom.value;
+  const to = effectiveTo.value;
+  return rows.filter((r) => inRange(String(r.log_date), from, to));
 });
 
 /* Highlight row for dayFilter (if exists) */
 const highlightedKey = computed(() => {
   if (!dayFilter.value) return "";
   const target = String(dayFilter.value);
-  const match = dateRows.value.find((r) => String(r.log_date) === target);
+  const match = employeeRecords.value.find((r) => String(r.log_date) === target);
   return match?._key || "";
+});
+
+/* Day missing (for create button) */
+const dayMissing = computed(() => {
+  if (!selectedEmployeeId.value || !dayFilter.value) return false;
+  return !attendance.value.some(
+    (a) =>
+      Number(a.user_id) === Number(selectedEmployeeId.value) &&
+      String(a.log_date) === String(dayFilter.value),
+  );
 });
 
 /* ===== Edit state per record ===== */
 const empEdit = ref({});
 const empSaving = ref({});
+const creatingDayRecord = ref(false);
 
 /* ===== Normalizers ===== */
 function normalizeToHHMM(src) {
@@ -431,7 +431,7 @@ function initEmpEditState() {
     return;
   }
   const obj = {};
-  for (const r of dateRows.value) {
+  for (const r of employeeRecords.value) {
     obj[r._key] = {
       time_in: normalizeToHHMM(r.time_in),
       lunch_start: normalizeToHHMM(r.lunch_start),
@@ -483,11 +483,7 @@ async function saveRecord(rec) {
       time_out: toSaveDateTime(ymd, empEdit.value[rec._key]?.time_out),
     };
 
-    if (rec.isMissing) {
-      await createAttendanceLog(payload);
-    } else {
-      await updateAttendanceLog(rec._id, payload);
-    }
+    await updateAttendanceLog(rec._id, payload);
 
     await reloadAttendanceOnly();
     initEmpEditState();
@@ -496,6 +492,41 @@ async function saveRecord(rec) {
     alert("Save failed:\n" + JSON.stringify(e?.response?.data ?? { message: e.message }, null, 2));
   } finally {
     empSaving.value[rec._key] = false;
+  }
+}
+
+async function createRecordForDay(ymd) {
+  if (!selectedEmployeeId.value) return;
+
+  creatingDayRecord.value = true;
+  try {
+    const userId = selectedEmployeeId.value;
+    const deptId = getDeptIdForUser(userId);
+    if (deptId == null) {
+      alert(`Cannot create: user ${userId} has no department_id.`);
+      return;
+    }
+
+    const payload = {
+      log_date: ymd,
+      user_id: userId,
+      department_id: deptId,
+      time_in: null,
+      lunch_start: null,
+      lunch_end: null,
+      break_start: null,
+      break_end: null,
+      time_out: null,
+    };
+
+    await createAttendanceLog(payload);
+    await reloadAttendanceOnly();
+    initEmpEditState();
+  } catch (e) {
+    console.error("Create failed:", e?.response?.data ?? e);
+    alert("Create failed:\n" + JSON.stringify(e?.response?.data ?? { message: e.message }, null, 2));
+  } finally {
+    creatingDayRecord.value = false;
   }
 }
 
@@ -557,14 +588,6 @@ watch([cutoff, monthPick], ([newCutoff, newMonth]) => {
   dateFrom.value = range.from;
   dateTo.value = range.to;
 });
-
-/* Re-init state when dateRows changes (essential for showing all days) */
-watch(
-  () => dateRows.value.map(r => r._key).join('|'),
-  () => {
-    if (selectedEmployeeId.value) initEmpEditState();
-  }
-);
 </script>
 
 <style scoped>
@@ -743,18 +766,6 @@ tbody tr:hover {
 .row-highlight {
   background: #fff7ed !important;
 }
-.row-missing {
-  background: #fbfdff;
-}
-.mini-missing {
-  margin-top: 4px;
-  font-size: 11px;
-  color: #6b7280;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-/* ... */
 
 /* Buttons */
 .actions {
