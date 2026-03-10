@@ -170,10 +170,16 @@
               <tr
                 v-for="r in visibleRecords"
                 :key="r._key"
-                :class="{ 'row-highlight': r._key === highlightedKey }"
+                :class="{
+                  'row-highlight': r._key === highlightedKey,
+                  'row-missing': r.is_missing
+                }"
               >
                 <td>
-                  <div class="date-chip">{{ r.log_date }}</div>
+                  <div class="date-chip">
+                    {{ r.log_date }}
+                    <span v-if="r.is_missing" class="missing-badge">(Missing)</span>
+                  </div>
                 </td>
 
                 <td><input type="time" step="60" v-model="empEdit[r._key].time_in" /></td>
@@ -184,8 +190,14 @@
                 <td><input type="time" step="60" v-model="empEdit[r._key].time_out" /></td>
 
                 <td class="actions">
-                  <button class="btn btn-save" :disabled="empSaving[r._key]" @click="saveRecord(r)">
-                    {{ empSaving[r._key] ? "Saving..." : "Save" }}
+                  <button
+                    class="btn"
+                    :class="r.is_missing ? 'btn-add' : 'btn-save'"
+                    :disabled="empSaving[r._key]"
+                    @click="saveRecord(r)"
+                  >
+                    <span v-if="empSaving[r._key]">Saving...</span>
+                    <span v-else>{{ r.is_missing ? "Create" : "Save" }}</span>
                   </button>
                   <button class="btn btn-ghost" :disabled="empSaving[r._key]" @click="resetRecord(r)">
                     Cancel
@@ -373,28 +385,56 @@ const employeeRecords = computed(() => {
 
 /* Always show range list */
 const visibleRecords = computed(() => {
-  const rows = employeeRecords.value;
   const from = effectiveFrom.value;
   const to = effectiveTo.value;
-  return rows.filter((r) => inRange(String(r.log_date), from, to));
+  if (!from || !to) return [];
+
+  const existing = employeeRecords.value;
+  const list = [];
+  let curr = dayjs(to);
+  const start = dayjs(from);
+
+  while (curr.isAfter(start) || curr.isSame(start, "day")) {
+    const ymd = curr.format("YYYY-MM-DD");
+    const found = existing.find((r) => String(r.log_date) === ymd);
+
+    if (found) {
+      list.push(found);
+    } else {
+      // Virtual record for missing day
+      list.push({
+        _id: null,
+        _key: `missing-${ymd}`,
+        log_date: ymd,
+        time_in: null,
+        lunch_start: null,
+        lunch_end: null,
+        break_start: null,
+        break_end: null,
+        time_out: null,
+        is_missing: true,
+      });
+    }
+    curr = curr.subtract(1, "day");
+  }
+
+  return list;
 });
 
 /* Highlight row for dayFilter (if exists) */
 const highlightedKey = computed(() => {
   if (!dayFilter.value) return "";
   const target = String(dayFilter.value);
-  const match = employeeRecords.value.find((r) => String(r.log_date) === target);
+  const match = visibleRecords.value.find((r) => String(r.log_date) === target);
   return match?._key || "";
 });
 
 /* Day missing (for create button) */
 const dayMissing = computed(() => {
   if (!selectedEmployeeId.value || !dayFilter.value) return false;
-  return !attendance.value.some(
-    (a) =>
-      Number(a.user_id) === Number(selectedEmployeeId.value) &&
-      String(a.log_date) === String(dayFilter.value),
-  );
+  const target = String(dayFilter.value);
+  const match = visibleRecords.value.find((r) => String(r.log_date) === target);
+  return !!match?.is_missing;
 });
 
 /* ===== Edit state per record ===== */
@@ -431,7 +471,7 @@ function initEmpEditState() {
     return;
   }
   const obj = {};
-  for (const r of employeeRecords.value) {
+  for (const r of visibleRecords.value) {
     obj[r._key] = {
       time_in: normalizeToHHMM(r.time_in),
       lunch_start: normalizeToHHMM(r.lunch_start),
@@ -445,6 +485,17 @@ function initEmpEditState() {
 }
 
 function resetRecord(rec) {
+  if (rec.is_missing) {
+    empEdit.value[rec._key] = {
+      time_in: "",
+      lunch_start: "",
+      lunch_end: "",
+      break_start: "",
+      break_end: "",
+      time_out: "",
+    };
+    return;
+  }
   empEdit.value[rec._key] = {
     time_in: normalizeToHHMM(rec.time_in),
     lunch_start: normalizeToHHMM(rec.lunch_start),
@@ -483,7 +534,12 @@ async function saveRecord(rec) {
       time_out: toSaveDateTime(ymd, empEdit.value[rec._key]?.time_out),
     };
 
-    await updateAttendanceLog(rec._id, payload);
+    if (rec.is_missing) {
+      await createAttendanceLog(payload);
+    } else {
+      const logId = rec.log_id ?? rec.id ?? rec._id;
+      await updateAttendanceLog(logId, payload);
+    }
 
     await reloadAttendanceOnly();
     initEmpEditState();
@@ -877,5 +933,15 @@ tbody tr:hover {
   margin-top: 4px;
   color: #6b7280;
   font-size: 13px;
+}
+.row-missing {
+  background: #fefce8;
+}
+.missing-badge {
+  font-size: 10px;
+  color: #ca8a04;
+  font-weight: 700;
+  margin-left: 4px;
+  text-transform: uppercase;
 }
 </style>
