@@ -5,18 +5,18 @@ import { api } from "./api";
  * "Login" by querying /items/user and comparing plaintext password.
  * - If you want to restrict to user 176 only, set RESTRICT_TO_ID_176=true.
  */
-const RESTRICT_TO_ID_176 = true; // set true if only user 176 may login
+const LOGIN_RESTRICTION_USER_ID = import.meta.env.VITE_LOGIN_RESTRICTION_USER_ID || null;
 
 export async function login(email, password) {
     if (!email || !password) throw new Error("Email and password are required.");
 
     // If restricted to a single user:
-    if (RESTRICT_TO_ID_176) {
-        const res = await api.get("/items/user/176?fields=user_id,user_email,user_password,user_fname,user_lname,user_department");
+    if (LOGIN_RESTRICTION_USER_ID) {
+        const res = await api.get(`/items/user/${LOGIN_RESTRICTION_USER_ID}?fields=user_id,user_email,user_password,user_fname,user_lname,user_department`);
         const u = res?.data?.data;
-        if (!u) throw new Error("User 176 not found.");
+        if (!u) throw new Error(`User ${LOGIN_RESTRICTION_USER_ID} not found.`);
         if (String(u.user_email).trim().toLowerCase() !== String(email).trim().toLowerCase()) {
-            throw new Error("Email does not match user 176.");
+            throw new Error(`Email does not match user ${LOGIN_RESTRICTION_USER_ID}.`);
         }
         if (String(u.user_password) !== String(password)) {
             throw new Error("Invalid password.");

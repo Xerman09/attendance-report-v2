@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 
 // Accessing environment variables
 const BASE_URL = "/api";
-const STATIC_TOKEN = "";
+const STATIC_TOKEN = import.meta.env.VITE_STATIC_TOKEN || "";
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -229,8 +229,8 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow) => {
   const workEndStr = normalizeTimeHHmm(sch.work_end) || "17:00";
 
   const GRACE_MINUTES = 5;
-  const FULL_DAY_MINUTES = 480; 
-  const HALF_DAY_MINUTES = 240; 
+  const FULL_DAY_MINUTES = 480;
+  const HALF_DAY_MINUTES = 240;
 
   const timeIn = parseDT(logRow?.time_in);
   const timeOut = parseDT(logRow?.time_out);
@@ -262,7 +262,7 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow) => {
   let undertime = 0;
   if (!timeOut) {
     // No timeout = Automatic 240 mins undertime
-    undertime = HALF_DAY_MINUTES; 
+    undertime = HALF_DAY_MINUTES;
   } else if (timeOut.isBefore(workEnd)) {
     // Early out = difference from scheduled end
     undertime = workEnd.diff(timeOut, "minute");
