@@ -2,7 +2,7 @@
   <section class="row">
     <!-- ================= LOGIN BOX ================= -->
     <div v-if="!currentUser" class="card login-card">
-      <h3 class="title">Login Required</h3>
+      <h3 class="title">Login  Required</h3>
       <p class="muted">Sign in using your email and password (validated via <code>/items/user</code>).</p>
 
       <div class="login-grid">
