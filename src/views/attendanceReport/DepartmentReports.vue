@@ -112,12 +112,15 @@
               <th>Late</th>
               <th>Punctuality</th>
               <th>Status</th>
+              <th class="no-print">Geotag</th>
             </tr>
             </thead>
             <tbody>
-            <tr
+            <template
                 v-for="r in group.rows"
                 :key="r.key"
+            >
+            <tr
                 :class="{ 'row-consistent': r.consistentlyOnTime }"
             >
               <td class="col-name">
@@ -168,13 +171,142 @@
                   >{{ computeRowStatus(r) }}</span
                   >
               </td>
+
+              <!-- ✅ Miggle badge + dropdown trigger -->
+              <td class="no-print">
+                <div class="geo-actions" v-if="r.log_id">
+                  <span v-if="hasGeotag(r.log_id)" class="badge-miggle">Miggle</span>
+                  <span v-else class="muted small">—</span>
+
+                  <button
+                    v-if="hasGeotag(r.log_id)"
+                    class="btn btn-ghost btn-mini"
+                    type="button"
+                    @click="toggleGeo(r.log_id)"
+                  >
+                    {{ geoOpen[String(r.log_id)] ? "Hide" : "View" }}
+                  </button>
+                </div>
+                <span v-else class="muted small">—</span>
+              </td>
             </tr>
+
+            <!-- ✅ Dropdown preview row -->
+            <tr v-if="r.log_id && geoOpen[String(r.log_id)]" class="no-print">
+              <td colspan="7" class="geo-cell">
+                <div class="geotag-panel">
+                  <div class="geotag-panel-header">
+                    <div class="panel-title">Geotag Evidence</div>
+                    <div class="panel-sub muted small">
+                      Log #{{ r.log_id }} · {{ r.date }}
+                    </div>
+                  </div>
+
+                  <div class="geo-compare">
+                    <!-- TIME IN -->
+                    <div class="geo-col">
+                      <div class="geo-col-title">Time In</div>
+                      <div v-if="geotagPick(r.log_id, 'TIME_IN')" class="geo-stack">
+                        <div class="map-wrap">
+                          <iframe
+                            class="map-iframe"
+                            :src="mapEmbedUrl(geotagPick(r.log_id, 'TIME_IN'))"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                          ></iframe>
+                        </div>
+                        <div class="img-wrap" v-if="geotagImageUrl(geotagPick(r.log_id, 'TIME_IN'))">
+                          <img
+                            :src="geotagImageUrl(geotagPick(r.log_id, 'TIME_IN'))"
+                            alt="Time In photo"
+                            class="click-zoom"
+                            @click="openZoom(geotagImageUrl(geotagPick(r.log_id, 'TIME_IN')), 'Time In')"
+                          />
+                        </div>
+                        <div v-else class="muted small">No image.</div>
+                        <div class="geo-meta muted small">
+                          <span>📍 {{ coordsText(geotagPick(r.log_id, 'TIME_IN')) || "No coordinates" }}</span>
+                          <span> · </span>
+                          <span>{{ prettyCapturedAt(geotagPick(r.log_id, 'TIME_IN')?.captured_at) }}</span>
+                        </div>
+                      </div>
+                      <div v-else class="geo-empty muted small">No Time In geotag.</div>
+                    </div>
+
+                    <!-- TIME OUT -->
+                    <div class="geo-col">
+                      <div class="geo-col-title">Time Out</div>
+                      <div v-if="geotagPick(r.log_id, 'TIME_OUT')" class="geo-stack">
+                        <div class="map-wrap">
+                          <iframe
+                            class="map-iframe"
+                            :src="mapEmbedUrl(geotagPick(r.log_id, 'TIME_OUT'))"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                          ></iframe>
+                        </div>
+                        <div class="img-wrap" v-if="geotagImageUrl(geotagPick(r.log_id, 'TIME_OUT'))">
+                          <img
+                            :src="geotagImageUrl(geotagPick(r.log_id, 'TIME_OUT'))"
+                            alt="Time Out photo"
+                            class="click-zoom"
+                            @click="openZoom(geotagImageUrl(geotagPick(r.log_id, 'TIME_OUT')), 'Time Out')"
+                          />
+                        </div>
+                        <div v-else class="muted small">No image.</div>
+                        <div class="geo-meta muted small">
+                          <span>📍 {{ coordsText(geotagPick(r.log_id, 'TIME_OUT')) || "No coordinates" }}</span>
+                          <span> · </span>
+                          <span>{{ prettyCapturedAt(geotagPick(r.log_id, 'TIME_OUT')?.captured_at) }}</span>
+                        </div>
+                      </div>
+                      <div v-else class="geo-empty muted small">No Time Out geotag.</div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            </template>
+
             <tr v-if="group.rows.length === 0">
-              <td colspan="6" class="muted center">No records.</td>
+              <td colspan="7" class="muted center">No records.</td>
             </tr>
             </tbody>
           </table>
         </template>
+      </div>
+    </div>
+
+    <!-- ✅ Image Zoom Modal -->
+    <div v-if="zoom.open" class="zoom-overlay no-print" @click.self="closeZoom">
+      <div class="zoom-toolbar">
+        <div class="zoom-title">{{ zoom.title || "Preview" }}</div>
+        <div class="zoom-actions">
+          <button class="btn btn-ghost btn-mini" type="button" @click="zoomOut">−</button>
+          <button class="btn btn-ghost btn-mini" type="button" @click="resetZoom">Reset</button>
+          <button class="btn btn-ghost btn-mini" type="button" @click="zoomIn">+</button>
+          <button class="btn btn-ghost btn-mini" type="button" @click="closeZoom">✕</button>
+        </div>
+      </div>
+
+      <div
+        class="zoom-stage"
+        @wheel.prevent="onWheelZoom"
+        @mousedown="onDragStart"
+        @mousemove="onDragMove"
+        @mouseup="onDragEnd"
+        @mouseleave="onDragEnd"
+        @touchstart.passive="onTouchStart"
+        @touchmove.prevent="onTouchMove"
+        @touchend="onTouchEnd"
+      >
+        <img
+          class="zoom-img"
+          :src="zoom.src"
+          alt="Zoom"
+          :style="zoomImgStyle"
+          draggable="false"
+        />
       </div>
     </div>
   </section>
@@ -190,6 +322,8 @@ import {
   fetchAttendance,
   fetchOnCallList,
   fetchOnCallSchedules,
+  fetchGeotags,
+  getDirectImageUrl,
 } from "../../services/api";
 import { computeStatus, minutesToHHMM } from "../../utils/time";
 
@@ -197,6 +331,10 @@ const users = ref([]);
 const departments = ref([]);
 const schedules = ref([]);
 const attendance = ref([]);
+
+/* --- geotags --- */
+const geotags = ref([]);
+const geoOpen = ref({});
 
 /* --- jake-oncall datasets --- */
 const onCallList = ref([]);
@@ -422,6 +560,7 @@ function buildRow(u, ymd) {
   if (!isWorkingDay) {
     return {
       key: `r-${u.user_id}-${ymd}`,
+      log_id: rec ? rec.log_id : null,
       empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
       status: "Rest Day",
       punctuality: "—",
@@ -436,6 +575,7 @@ function buildRow(u, ymd) {
   if (!rec || (!rec.time_in && !rec.time_out)) {
     return {
       key: `r-${u.user_id}-${ymd}`,
+      log_id: rec ? rec.log_id : null,
       empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
       status: "Absent",
       punctuality: "—",
@@ -515,6 +655,7 @@ function buildRow(u, ymd) {
 
   return {
     key: `r-${u.user_id}-${ymd}`,
+    log_id: rec ? rec.log_id : null,
     empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
     status,
     punctuality,
@@ -591,13 +732,14 @@ const totalLateHHMM = computed(() => minutesToHHMM(totalLateMinutes.value));
 const totalOvertimeHHMM = computed(() => minutesToHHMM(totalOvertimeMinutes.value));
 
 onMounted(async () => {
-  const [u, d, s, a, ocList, ocScheds] = await Promise.all([
+  const [u, d, s, a, ocList, ocScheds, g] = await Promise.all([
     fetchUsers(),
     fetchDepartments(),
     fetchSchedules(),
     fetchAttendance(),
     fetchOnCallList(),
     fetchOnCallSchedules(),
+    fetchGeotags(),
   ]);
   users.value = u;
   departments.value = d;
@@ -605,6 +747,7 @@ onMounted(async () => {
   attendance.value = a;
   onCallList.value = ocList;
   onCallSchedules.value = ocScheds;
+  geotags.value = g;
 
   if (d && d.length) deptId.value = d[0].department_id;
 
@@ -671,6 +814,224 @@ function printDetails() {
     console.error("Print failed", e);
     window.print();
   }
+}
+/* ---------- Geotag Helpers & Zoom ---------- */
+const geotagsByLogId = computed(() => {
+  const m = new Map();
+  for (const g of geotags.value || []) {
+    const id = g.log_id;
+    if (id == null) continue;
+    const key = String(id);
+    if (!m.has(key)) m.set(key, []);
+    m.get(key).push(g);
+  }
+  return m;
+});
+
+function geotagsForLog(logId) {
+  return geotagsByLogId.value.get(String(logId)) || [];
+}
+
+function hasGeotag(logId) {
+  return geotagsForLog(logId).length > 0;
+}
+
+function toggleGeo(logId) {
+  const k = String(logId);
+  geoOpen.value = { ...geoOpen.value, [k]: !geoOpen.value[k] };
+}
+
+function coordsOf(g) {
+  const c = g?.position?.coordinates;
+  if (!Array.isArray(c) || c.length < 2) return null;
+  const lng = Number(c[0]);
+  const lat = Number(c[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+function coordsText(g) {
+  const p = coordsOf(g);
+  return p ? `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}` : "";
+}
+function prettyCapturedAt(v) {
+  if (!v) return "";
+  const d = dayjs(String(v));
+  return d.isValid() ? d.format("MMM D, YYYY h:mma") : String(v);
+}
+
+function geotagPick(logId, kind) {
+  const arr = geotagsForLog(logId);
+  if (!arr.length) return null;
+
+  const filtered = arr.filter(
+    (g) => String(g.kind || "").toUpperCase() === String(kind).toUpperCase()
+  );
+  if (!filtered.length) return null;
+
+  filtered.sort((a, b) => {
+    const ad = String(a.captured_at || "");
+    const bd = String(b.captured_at || "");
+    if (ad && bd) return bd.localeCompare(ad);
+    return Number(b.geotag_id || 0) - Number(a.geotag_id || 0);
+  });
+
+  return filtered[0];
+}
+
+function mapEmbedUrl(g) {
+  const p = coordsOf(g);
+  if (!p) return "";
+  const q = encodeURIComponent(`${p.lat},${p.lng}`);
+  return `https://maps.google.com/maps?q=${q}&z=16&output=embed`;
+}
+
+function geotagImageUrl(g) {
+  const id = g?.image_path;
+  if (!id || id === "null" || id === "undefined") return null;
+  return `/api/assets/${encodeURIComponent(String(id))}?access_token=rTilKSsclzuQW8WfQWK1ba8wrD_LetNn`;
+}
+
+/* ---------- Zoom modal ---------- */
+const zoom = ref({
+  open: false,
+  src: "",
+  title: "",
+  scale: 1,
+  x: 0,
+  y: 0,
+  dragging: false,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  touchDist: 0,
+});
+
+const zoomImgStyle = computed(() => ({
+  transform: `translate(${zoom.value.x}px, ${zoom.value.y}px) scale(${zoom.value.scale})`,
+}));
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function onZoomKeydown(e) {
+  if (e.key === "Escape") closeZoom();
+}
+
+function openZoom(src, title = "") {
+  if (!src) return;
+  zoom.value.open = true;
+  zoom.value.src = src;
+  zoom.value.title = title;
+  zoom.value.scale = 1;
+  zoom.value.x = 0;
+  zoom.value.y = 0;
+  zoom.value.dragging = false;
+  window.addEventListener("keydown", onZoomKeydown);
+}
+
+function closeZoom() {
+  zoom.value.open = false;
+  zoom.value.src = "";
+  zoom.value.title = "";
+  zoom.value.dragging = false;
+  window.removeEventListener("keydown", onZoomKeydown);
+}
+
+function zoomIn() {
+  zoom.value.scale = clamp(zoom.value.scale + 0.2, 1, 6);
+}
+function zoomOut() {
+  zoom.value.scale = clamp(zoom.value.scale - 0.2, 1, 6);
+  if (zoom.value.scale === 1) {
+    zoom.value.x = 0;
+    zoom.value.y = 0;
+  }
+}
+function resetZoom() {
+  zoom.value.scale = 1;
+  zoom.value.x = 0;
+  zoom.value.y = 0;
+}
+
+function onWheelZoom(e) {
+  const delta = e.deltaY > 0 ? -0.15 : 0.15;
+  zoom.value.scale = clamp(zoom.value.scale + delta, 1, 6);
+  if (zoom.value.scale === 1) {
+    zoom.value.x = 0;
+    zoom.value.y = 0;
+  }
+}
+
+function onDragStart(e) {
+  if (!zoom.value.open) return;
+  if (zoom.value.scale <= 1) return;
+  zoom.value.dragging = true;
+  zoom.value.startX = e.clientX;
+  zoom.value.startY = e.clientY;
+  zoom.value.lastX = zoom.value.x;
+  zoom.value.lastY = zoom.value.y;
+}
+function onDragMove(e) {
+  if (!zoom.value.dragging) return;
+  const dx = e.clientX - zoom.value.startX;
+  const dy = e.clientY - zoom.value.startY;
+  zoom.value.x = zoom.value.lastX + dx;
+  zoom.value.y = zoom.value.lastY + dy;
+}
+function onDragEnd() {
+  zoom.value.dragging = false;
+}
+
+function dist(a, b) {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function onTouchStart(e) {
+  if (!zoom.value.open) return;
+  const t = e.touches;
+  if (t.length === 1 && zoom.value.scale > 1) {
+    zoom.value.dragging = true;
+    zoom.value.startX = t[0].clientX;
+    zoom.value.startY = t[0].clientY;
+    zoom.value.lastX = zoom.value.x;
+    zoom.value.lastY = zoom.value.y;
+  } else if (t.length === 2) {
+    zoom.value.dragging = false;
+    zoom.value.touchDist = dist(t[0], t[1]);
+  }
+}
+function onTouchMove(e) {
+  if (!zoom.value.open) return;
+  const t = e.touches;
+
+  if (t.length === 1 && zoom.value.dragging && zoom.value.scale > 1) {
+    const dx = t[0].clientX - zoom.value.startX;
+    const dy = t[0].clientY - zoom.value.startY;
+    zoom.value.x = zoom.value.lastX + dx;
+    zoom.value.y = zoom.value.lastY + dy;
+    return;
+  }
+
+  if (t.length === 2) {
+    const d = dist(t[0], t[1]);
+    const ratio = d / (zoom.value.touchDist || d);
+    const nextScale = clamp(zoom.value.scale * ratio, 1, 6);
+    zoom.value.scale = nextScale;
+    zoom.value.touchDist = d;
+
+    if (zoom.value.scale === 1) {
+      zoom.value.x = 0;
+      zoom.value.y = 0;
+    }
+  }
+}
+function onTouchEnd() {
+  zoom.value.dragging = false;
+  zoom.value.touchDist = 0;
 }
 </script>
 
@@ -791,4 +1152,173 @@ input:focus, select:focus { border-color: #111827; }
 .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
 .dot-ok { background: #10b981; }
 .row-consistent td { background: rgba(16, 185, 129, 0.08); }
+
+/* btn ghost / mini */
+.btn-ghost {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #111827;
+  font-weight: 600;
+}
+.btn-ghost:hover {
+  background: #f9fafb;
+}
+.btn-mini {
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* ✅ Miggle badge + actions */
+.geo-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.badge-miggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+}
+
+/* ✅ Geotag dropdown panel */
+.geo-cell {
+  background: #fff;
+  padding: 12px;
+}
+.geotag-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+.geotag-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.panel-title {
+  font-weight: 900;
+  color: #111827;
+}
+.panel-sub {
+  white-space: nowrap;
+}
+
+/* ✅ 2-column TIME IN / TIME OUT preview */
+.geo-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.geo-col {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+.geo-col-title {
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 10px;
+}
+.geo-stack {
+  display: grid;
+  gap: 10px;
+}
+.map-wrap {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+}
+.map-iframe {
+  width: 100%;
+  height: 220px;
+  border: 0;
+  display: block;
+}
+.img-wrap img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  display: block;
+}
+.geo-meta {
+  line-height: 1.4;
+}
+.geo-empty {
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px dashed #e5e7eb;
+}
+@media (max-width: 900px) {
+  .geo-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ✅ click to zoom */
+.click-zoom {
+  cursor: zoom-in;
+}
+.small { font-size: 12px; }
+
+/* ✅ fullscreen zoom modal */
+.zoom-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.72);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  z-index: 9999;
+}
+.zoom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+}
+.zoom-title {
+  font-weight: 900;
+  color: #111827;
+}
+.zoom-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.zoom-stage {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  cursor: grab;
+}
+.zoom-stage:active {
+  cursor: grabbing;
+}
+.zoom-img {
+  max-width: 92vw;
+  max-height: 82vh;
+  user-select: none;
+  -webkit-user-drag: none;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  transform-origin: center center;
+}
 </style>

@@ -595,9 +595,10 @@ async function bootAfterAuth() {
     departments.value = d;
     attendance.value = a;
 
-    // default range anchored to today
-    dateTo.value = dayjs().format("YYYY-MM-DD");
-    dateFrom.value = dayjs(dateTo.value).subtract(19, "day").format("YYYY-MM-DD");
+    // default range anchored to selected cutoff
+    const range = computeCutoffRange(monthPick.value, cutoff.value);
+    dateFrom.value = range.from;
+    dateTo.value = range.to;
   } finally {
     loading.value = false;
   }
@@ -614,7 +615,7 @@ onUnmounted(() => {
   if (_nowTimer) clearInterval(_nowTimer);
 });
 
-/* When employee changes: init edit state + reset range to last 20 days (to=today) */
+/* When employee changes: init edit state + reset range to selected cutoff */
 watch(
   () => selectedEmployeeId.value,
   (v) => {
@@ -623,8 +624,9 @@ watch(
       dayFilter.value = "";
       return;
     }
-    dateTo.value = dayjs().format("YYYY-MM-DD");
-    dateFrom.value = dayjs(dateTo.value).subtract(19, "day").format("YYYY-MM-DD");
+    const range = computeCutoffRange(monthPick.value, cutoff.value);
+    dateFrom.value = range.from;
+    dateTo.value = range.to;
     initEmpEditState();
   },
 );
@@ -643,6 +645,13 @@ watch([cutoff, monthPick], ([newCutoff, newMonth]) => {
   const range = computeCutoffRange(newMonth, newCutoff);
   dateFrom.value = range.from;
   dateTo.value = range.to;
+});
+
+/* Reinitialize edit state anytime date boundaries change */
+watch([dateFrom, dateTo], () => {
+  if (selectedEmployeeId.value) {
+    initEmpEditState();
+  }
 });
 </script>
 
