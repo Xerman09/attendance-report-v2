@@ -8,7 +8,7 @@ const STATIC_TOKEN = import.meta.env.VITE_STATIC_TOKEN || "";
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 20000,
-
+  headers: STATIC_TOKEN ? { Authorization: `Bearer ${STATIC_TOKEN}` } : {}
 });
 
 /* ---------- ASSETS / IMAGES ---------- */
