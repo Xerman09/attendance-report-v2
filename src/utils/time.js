@@ -60,12 +60,21 @@ export function computeStatus({ time_in, time_out, expectedStart, expectedEnd })
   }
 
   // Normal attendance
-  const inTime  = dayjs(time_in);
-  const outTime = dayjs(time_out);
+  let inTime  = dayjs(time_in);
+  let outTime = dayjs(time_out);
+
+  if (outTime.isBefore(inTime)) {
+    outTime = outTime.add(1, 'day');
+  }
+
   const total = Math.max(0, outTime.diff(inTime,'minute'));
   const lateRaw  = computeLateMinutes(time_in, expectedStart);
-  const outBase = (time_out || time_in);
-  const endSched = outBase ? dayjs(dayjs(outBase).format('YYYY-MM-DD') + 'T' + expectedEnd) : dayjs(expectedEnd,'HH:mm:ss');
+  
+  let endSched = dayjs(inTime.format('YYYY-MM-DD') + 'T' + expectedEnd);
+  if (expectedEnd < expectedStart) {
+    endSched = endSched.add(1, 'day');
+  }
+
   const overtimeRaw = Math.max(0, outTime.diff(endSched,'minute'));
   const overtime = overtimeRaw >= 90 ? overtimeRaw : 0;
 

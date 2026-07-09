@@ -635,10 +635,10 @@ const rows = computed(() => {
 
     // Late rules
     let customLateMinutes = 0;
+    const actualIn = parseHM(dayISO, l.time_in ? fmtTime(l.time_in) : null) || parseHM(dayISO, l.time_in);
+
     if (!isRest) {
       const graceTime = schedStart ? schedStart.add(5, "minute") : null;
-      const actualIn =
-        parseHM(dayISO, l.time_in ? fmtTime(l.time_in) : null) || parseHM(dayISO, l.time_in);
       if (graceTime && actualIn && actualIn.isAfter(graceTime)) customLateMinutes += actualIn.diff(graceTime, "minute");
 
       const actualLunchStart = parseHM(dayISO, lunchStartRaw);
@@ -659,20 +659,33 @@ const rows = computed(() => {
     const finalStatus = isRest ? "Rest Day" : baseStat.status;
     const isOff = finalStatus === "Rest Day" || finalStatus === "Absent" || finalStatus === "Prehire";
 
-    const tOutParsed = isRest
+    let tOutParsed = isRest && !l.time_out
       ? null
       : parseHM(dayISO, l.time_out ? fmtTime(l.time_out) : null) || parseHM(dayISO, l.time_out);
 
+    if (tOutParsed) {
+      if (actualIn && tOutParsed.isBefore(actualIn)) {
+        tOutParsed = tOutParsed.add(1, 'day');
+      } else if (!actualIn && schedStart && tOutParsed.isBefore(schedStart)) {
+        tOutParsed = tOutParsed.add(1, 'day');
+      }
+    }
+
+    let effectiveSchedEnd = schedEnd;
+    if (schedEnd && schedStart && schedEnd.isBefore(schedStart)) {
+      effectiveSchedEnd = schedEnd.add(1, 'day');
+    }
+
     let undertimeMinutesFinal = null;
     if (!isOff) {
-      if (schedEnd && tOutParsed && tOutParsed.isBefore(schedEnd)) undertimeMinutesFinal = schedEnd.diff(tOutParsed, "minute");
+      if (effectiveSchedEnd && tOutParsed && tOutParsed.isBefore(effectiveSchedEnd)) undertimeMinutesFinal = effectiveSchedEnd.diff(tOutParsed, "minute");
       else undertimeMinutesFinal = 0;
     }
 
     let workMinutesFinal = null;
     if (!isOff) {
-      if (tOutParsed && schedStart && schedEnd) {
-        if (tOutParsed.isBefore(schedEnd)) {
+      if (tOutParsed && schedStart && effectiveSchedEnd) {
+        if (tOutParsed.isBefore(effectiveSchedEnd)) {
           workMinutesFinal = Math.max(0, Math.min(tOutParsed.diff(schedStart, "minute") - 60, 480));
         } else {
           workMinutesFinal = 480;
