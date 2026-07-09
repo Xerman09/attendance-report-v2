@@ -281,6 +281,7 @@ import {
   fetchUsers,
   fetchDepartments,
   fetchSchedules,
+  fetchUserSchedules,
   fetchAttendanceApprovalsByEmployeeRange,
   createAttendanceApproval,
   updateAttendanceApproval,
@@ -326,6 +327,7 @@ function handleLogout() {
   pendingEmployees.value = [];
   departments.value = [];
   schedules.value = [];
+  userSchedules.value = [];
 }
 
 /* ================= HEADER CLOCK ================= */
@@ -341,6 +343,7 @@ const pageError = ref("");
 const users = ref([]);
 const departments = ref([]);
 const schedules = ref([]);
+const userSchedules = ref([]);
 
 /* Controls */
 const cutoff = ref("26-10");
@@ -385,10 +388,22 @@ const scheduleByDeptId = computed(() => {
   return m;
 });
 
+const scheduleByUserId = computed(() => {
+  const m = new Map();
+  for (const s of userSchedules.value || []) {
+    const uid = Number(s.user_id ?? 0);
+    if (uid) m.set(uid, s);
+  }
+  return m;
+});
+
 function getScheduleForDept(deptId) {
   return scheduleByDeptId.value.get(Number(deptId || 0)) || null;
 }
-const selectedSchedule = computed(() => getScheduleForDept(selectedEmployeeDeptId.value));
+function getScheduleForUser(userId) {
+  return scheduleByUserId.value.get(Number(userId || 0)) || null;
+}
+const selectedSchedule = computed(() => getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(selectedEmployeeDeptId.value));
 
 /* Filter Logic */
 const filteredPendingEmployees = computed(() => {
@@ -645,7 +660,7 @@ async function loadEmployeeRows() {
     const logByDate = new Map();
     for (const l of logs || []) logByDate.set(String(l.log_date), l);
     
-    const schedule = getScheduleForDept(selectedEmployeeDeptId.value);
+    const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(selectedEmployeeDeptId.value);
 
     const allRows = dates.map((d) => {
       const a = apprByDate.get(d) || null;
@@ -698,7 +713,7 @@ async function loadEmployeeRows() {
 async function recomputeRow(r) {
   try {
     if (!r?.log_id) return;
-    const schedule = getScheduleForDept(r.department_id || selectedEmployeeDeptId.value);
+    const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(r.department_id || selectedEmployeeDeptId.value);
     const computed = computeApprovalMinutes(r.date_schedule, r.logRow, schedule);
     edit.value[r._key] = { ...(edit.value[r._key] || {}), ...computed, overtime_minutes: 0 };
   } catch (err) { console.error(err); }
@@ -707,7 +722,7 @@ async function recomputeRow(r) {
 async function recomputeAll() {
   bulkSaving.value = true;
   try {
-    const schedule = getScheduleForDept(selectedEmployeeDeptId.value);
+    const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(selectedEmployeeDeptId.value);
     for (const r of dateRows.value) {
       if (!r.log_id) continue;
       const computed = computeApprovalMinutes(r.date_schedule, r.logRow, schedule);
@@ -769,10 +784,11 @@ async function rejectAllVisible() { await bulkSetStatus("rejected"); }
 async function bootAfterAuth() {
   loading.value = true;
   try {
-    const [u, d, s] = await Promise.all([fetchUsers(), fetchDepartments(), fetchSchedules()]);
+    const [u, d, s, us] = await Promise.all([fetchUsers(), fetchDepartments(), fetchSchedules(), fetchUserSchedules()]);
     users.value = u || [];
     departments.value = d || [];
     schedules.value = s || [];
+    userSchedules.value = us || [];
     pendingEmployees.value = [];
     closeEmployee();
   } catch (err) {

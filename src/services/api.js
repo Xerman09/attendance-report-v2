@@ -61,6 +61,33 @@ export const fetchSchedules = async () => {
   return data?.data ?? [];
 };
 
+export const fetchUserSchedules = async () => {
+  const params = new URLSearchParams();
+  params.set("limit", "-1");
+
+  params.set(
+    "fields",
+    [
+      "id",
+      "user_id",
+      "working_days",
+      "work_start",
+      "work_end",
+      "lunch_start",
+      "lunch_end",
+      "break_start",
+      "break_end",
+      "workdays_note",
+      "grace_period",
+      "created_at",
+      "updated_at",
+    ].join(","),
+  );
+
+  const { data } = await api.get(`/items/user_schedule?${params.toString()}`);
+  return data?.data ?? [];
+};
+
 export const fetchAttendance = async () => {
   const { data } = await api.get("/items/attendance_log?limit=-1");
   return data?.data ?? [];
@@ -228,7 +255,7 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow) => {
   const workStartStr = normalizeTimeHHmm(sch.work_start) || "08:00";
   const workEndStr = normalizeTimeHHmm(sch.work_end) || "17:00";
 
-  const GRACE_MINUTES = 5;
+  const GRACE_MINUTES = sch.grace_period != null ? Number(sch.grace_period) : 5;
   const FULL_DAY_MINUTES = 480;
   const HALF_DAY_MINUTES = 240;
 
