@@ -601,16 +601,16 @@ const rows = computed(() => {
         ? { totalMinutes: 0, lateMinutes: 0, overtimeMinutes: 0, status: "Rest Day" }
         : computeStatus({ time_in: l.time_in, time_out: l.time_out, expectedStart, expectedEnd });
 
-    const outPretty = isRest
-      ? ""
-      : l.time_out
+    const outPretty = l.time_out
       ? fmtTime(l.time_out)
+      : isRest
+      ? ""
       : displayTimeOutWhenMissing({ log_date: l.log_date, expectedStart });
 
-    const lunchStartRaw = isRest ? null : pickTime(l, ["lunch_start", "lunchStart", "lunch_in", "lunchIn"]);
-    const lunchEndRaw = isRest ? null : pickTime(l, ["lunch_end", "lunchEnd", "lunch_out", "lunchOut"]);
-    const breakStartRaw = isRest ? null : pickTime(l, ["break_start", "breakStart", "break_in", "breakIn"]);
-    const breakEndRaw = isRest ? null : pickTime(l, ["break_end", "breakEnd", "break_out", "breakOut"]);
+    const lunchStartRaw = pickTime(l, ["lunch_start", "lunchStart", "lunch_in", "lunchIn"]);
+    const lunchEndRaw = pickTime(l, ["lunch_end", "lunchEnd", "lunch_out", "lunchOut"]);
+    const breakStartRaw = pickTime(l, ["break_start", "breakStart", "break_in", "breakIn"]);
+    const breakEndRaw = pickTime(l, ["break_end", "breakEnd", "break_out", "breakOut"]);
 
     function parseHM(baseDate, hm) {
       if (!hm) return null;
@@ -688,12 +688,12 @@ const rows = computed(() => {
     return {
       ...l,
       date_fmt: dayjs(String(l.log_date)).format("MMM D, YYYY"),
-      time_in_fmt: isOff ? "" : fmtTime(l.time_in),
-      lunch_start_fmt: isOff ? "" : lunchStartRaw ? prettyAnyTime(lunchStartRaw, l.log_date) : "",
-      lunch_end_fmt: isOff ? "" : lunchEndRaw ? prettyAnyTime(lunchEndRaw, l.log_date) : "",
-      break_start_fmt: isOff ? "" : breakStartRaw ? prettyAnyTime(breakStartRaw, l.log_date) : "",
-      break_end_fmt: isOff ? "" : breakEndRaw ? prettyAnyTime(breakEndRaw, l.log_date) : "",
-      time_out_fmt: isOff ? "" : outPretty,
+      time_in_fmt: isOff && !l.time_in ? "" : fmtTime(l.time_in),
+      lunch_start_fmt: isOff && !lunchStartRaw ? "" : lunchStartRaw ? prettyAnyTime(lunchStartRaw, l.log_date) : "",
+      lunch_end_fmt: isOff && !lunchEndRaw ? "" : lunchEndRaw ? prettyAnyTime(lunchEndRaw, l.log_date) : "",
+      break_start_fmt: isOff && !breakStartRaw ? "" : breakStartRaw ? prettyAnyTime(breakStartRaw, l.log_date) : "",
+      break_end_fmt: isOff && !breakEndRaw ? "" : breakEndRaw ? prettyAnyTime(breakEndRaw, l.log_date) : "",
+      time_out_fmt: isOff && !l.time_out && !outPretty ? "" : outPretty,
       workMinutes: workMinutesFinal,
       lateMinutes: isOff ? null : customLateMinutes,
       undertimeMinutes: isOff ? null : undertimeMinutesFinal,
