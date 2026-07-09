@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
         },
         preview: {
             host: '0.0.0.0',
-            port: 5173,
+            port: env.VITE_PREVIEW_PORT ? parseInt(env.VITE_PREVIEW_PORT) : 5173,
             allowedHosts: allowedHosts
         }
     }
