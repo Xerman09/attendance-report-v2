@@ -87,7 +87,9 @@ export const fetchUserSchedules = async () => {
   );
 
   try {
-    const { data } = await api.get(`/items/user_schedule?${params.toString()}`);
+    const { data } = await api.get(`/items/user_schedule?${params.toString()}`, {
+      headers: { Authorization: null }
+    });
     return data?.data ?? [];
   } catch (err) {
     console.warn("fetchUserSchedules fallback:", err.message);
