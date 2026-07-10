@@ -15,7 +15,9 @@ export const api = axios.create({
 
 export const getDirectImageUrl = (id) => {
   if (!id || id === "null" || id === "undefined") return null;
-  return `${BASE_URL}/assets/${id}?access_token=${STATIC_TOKEN}`;
+  return STATIC_TOKEN 
+    ? `${BASE_URL}/assets/${id}?access_token=${STATIC_TOKEN}`
+    : `${BASE_URL}/assets/${id}`;
 };
 
 /* ---------- READ ---------- */
