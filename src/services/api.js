@@ -86,8 +86,13 @@ export const fetchUserSchedules = async () => {
     ].join(","),
   );
 
-  const { data } = await api.get(`/items/user_schedule?${params.toString()}`);
-  return data?.data ?? [];
+  try {
+    const { data } = await api.get(`/items/user_schedule?${params.toString()}`);
+    return data?.data ?? [];
+  } catch (err) {
+    console.warn("fetchUserSchedules fallback:", err.message);
+    return [];
+  }
 };
 
 export const fetchAttendance = async () => {
