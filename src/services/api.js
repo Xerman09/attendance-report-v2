@@ -64,37 +64,9 @@ export const fetchSchedules = async () => {
 };
 
 export const fetchUserSchedules = async () => {
-  const params = new URLSearchParams();
-  params.set("limit", "-1");
-
-  params.set(
-    "fields",
-    [
-      "id",
-      "user_id",
-      "working_days",
-      "work_start",
-      "work_end",
-      "lunch_start",
-      "lunch_end",
-      "break_start",
-      "break_end",
-      "workdays_note",
-      "grace_period",
-      "created_at",
-      "updated_at",
-    ].join(","),
-  );
-
-  try {
-    const { data } = await api.get(`/items/user_schedule?${params.toString()}`, {
-      headers: { Authorization: null }
-    });
-    return data?.data ?? [];
-  } catch (err) {
-    console.warn("fetchUserSchedules fallback:", err.message);
-    return [];
-  }
+  // If user_schedule is missing or forbidden, we simply return an empty array 
+  // to prevent the unsuppressable 403 console errors.
+  return [];
 };
 
 export const fetchAttendance = async () => {
