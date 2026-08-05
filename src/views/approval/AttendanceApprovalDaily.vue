@@ -59,7 +59,12 @@
 
         <div class="field field--search">
           <label>Search Employee</label>
-          <input class="search-input" placeholder="Search by name / id" v-model="q" />
+          <div style="display: flex; gap: 8px;">
+            <input class="search-input" placeholder="Search by name / id" v-model="q" style="flex: 1;" />
+            <button type="button" class="btn secondary" @click="showInactive = !showInactive" style="height: 42px; min-width: max-content;">
+              {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+            </button>
+          </div>
         </div>
 
         <div class="field">
@@ -91,13 +96,14 @@
             <tr
               v-for="r in displayRows"
               :key="r._key"
-              :class="{ 'row-missing': r.isMissing }"
+              :class="{ 'row-missing': r.isMissing, 'is-inactive': !isActiveUser(r.rawUser) }"
             >
               <td>
                 <div class="emp">
                   <div class="name">
                     {{ r.empName }}
                     <span v-if="r.isMissing" class="missing-tag">missing</span>
+                    <span v-if="!isActiveUser(r.rawUser)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
                   </div>
                   <div class="sub">#{{ r.employee_id }} • Dept 4</div>
                 </div>
@@ -212,6 +218,7 @@ const bulkSaving = ref(false);
 
 const selectedDate = ref(dayjs().format("YYYY-MM-DD"));
 const q = ref("");
+const showInactive = ref(false);
 
 const nowTime = ref(dayjs().format("h:mm:ss A"));
 let _nowTimer;
@@ -235,8 +242,11 @@ function isActiveUser(u) {
 }
 
 const dept4Users = computed(() => {
-  return (Array.isArray(users.value) ? users.value : [])
-    .filter(isActiveUser);
+  let list = Array.isArray(users.value) ? users.value : [];
+  if (!showInactive.value) {
+    list = list.filter(isActiveUser);
+  }
+  return list;
 });
 
 const approvalsByEmployeeId = computed(() => {
@@ -264,6 +274,7 @@ const rows = computed(() => {
       date_schedule: selectedDate.value,
 
       empName,
+      rawUser: u,
 
       work_minutes: Number(a?.work_minutes ?? 0),
       late_minutes: Number(a?.late_minutes ?? 0),
@@ -492,4 +503,21 @@ tbody tr:hover{background:#fafcff}
 .btn{height:34px;padding:0 12px;border-radius:10px;font-weight:800;font-size:12px;border:1px solid transparent;cursor:pointer}
 .btn-save{background:#065f46;color:#fff}
 .btn-ghost{background:#fff;color:#374151;border-color:#e5e7eb}
+
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
+}
 </style>
