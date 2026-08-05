@@ -64,7 +64,12 @@
             <label>Employee</label>
             <select v-model.number="selectedEmployeeId">
               <option :value="0">Select employee…</option>
-              <option v-for="u in usersFiltered" :key="u.user_id" :value="u.user_id">
+              <option 
+                v-for="u in usersFiltered" 
+                :key="u.user_id" 
+                :value="u.user_id"
+                :style="!isActiveUser(u) ? { backgroundColor: '#fef2f2', color: '#991b1b' } : {}"
+              >
                 {{ formatUserLabel(u) }}
               </option>
             </select>
@@ -72,7 +77,12 @@
 
           <div class="field field--search">
             <label>Search Employee</label>
-            <input class="search-input" placeholder="Search by name / id" v-model="q" />
+            <div style="display: flex; gap: 8px;">
+              <input class="search-input" placeholder="Search by name / id" v-model="q" style="flex: 1;" />
+              <button type="button" class="btn secondary" @click="showInactive = !showInactive" style="height: 42px;">
+                {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -275,6 +285,7 @@ let _nowTimer;
 
 const q = ref("");
 const selectedDepartmentId = ref(0);
+const showInactive = ref(false);
 
 /* Active detection */
 function isActiveUser(u) {
@@ -288,7 +299,7 @@ function isActiveUser(u) {
 const activeUsers = computed(() => (Array.isArray(users.value) ? users.value.filter(isActiveUser) : []));
 
 const usersFiltered = computed(() => {
-  let rows = activeUsers.value;
+  let rows = showInactive.value ? users.value : activeUsers.value;
 
   if (selectedDepartmentId.value) {
     rows = rows.filter((u) => Number(u.user_department) === selectedDepartmentId.value);
@@ -309,7 +320,8 @@ const usersFiltered = computed(() => {
 });
 function formatUserLabel(u) {
   const name = `${u.user_fname || ""} ${u.user_lname || ""}`.trim();
-  return `${name} (#${u.user_id})`;
+  const inactiveStr = isActiveUser(u) ? "" : " (Inactive)";
+  return `${name} (#${u.user_id})${inactiveStr}`;
 }
 
 /* Employee selection */
@@ -645,4 +657,17 @@ tbody tr:hover{background:#fafcff}
 .empty-state{border:1px dashed #e5e7eb;border-radius:14px;padding:18px;background:#fbfdff}
 .empty-title{font-weight:900;color:#111827;font-size:15px}
 .empty-sub{margin-top:4px;color:#6b7280;font-size:13px}
+
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
 </style>

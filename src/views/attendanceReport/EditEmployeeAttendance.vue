@@ -56,7 +56,12 @@
             <label>Employee</label>
             <select v-model.number="selectedEmployeeId">
               <option :value="0">Select employee…</option>
-              <option v-for="u in filteredActiveUsers" :key="u.user_id" :value="u.user_id">
+              <option 
+                v-for="u in filteredActiveUsers" 
+                :key="u.user_id" 
+                :value="u.user_id"
+                :style="!isActiveUser(u) ? { backgroundColor: '#fef2f2', color: '#991b1b' } : {}"
+              >
                 {{ formatUserLabel(u) }}
               </option>
             </select>
