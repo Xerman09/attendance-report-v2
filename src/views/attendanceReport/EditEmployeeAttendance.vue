@@ -71,7 +71,7 @@
                 v-model="q"
                 style="flex: 1;"
               />
-              <button class="btn secondary" @click="showInactive = !showInactive" style="height: 42px;">
+              <button type="button" class="btn secondary" @click="showInactive = !showInactive" style="height: 42px;">
                 {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
               </button>
             </div>

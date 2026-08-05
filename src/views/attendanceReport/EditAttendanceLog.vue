@@ -59,6 +59,9 @@
           <label>Search Employee</label>
           <div class="search-line">
             <input class="search-input" placeholder="Search by name or email" v-model="q" />
+            <button type="button" class="btn secondary" @click="showInactive = !showInactive" style="margin-bottom: 0; min-width: max-content; height: 42px;">
+              {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+            </button>
           </div>
         </div>
 
@@ -85,10 +88,13 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="row in displayRows" :key="row.key">
+          <tr v-for="row in displayRows" :key="row.key" :class="{ 'is-inactive': !isActiveUser(row.rawUser) }">
             <td>
               <div class="emp">
-                <div class="name">{{ row.empName }}</div>
+                <div class="name">
+                  {{ row.empName }}
+                  <span v-if="!isActiveUser(row.rawUser)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
+                </div>
                 <div class="dept">{{ row.deptName }}</div>
               </div>
             </td>
@@ -196,6 +202,7 @@ let _nowTimer;
 const selectedDate = ref(dayjs().format("YYYY-MM-DD"));
 const deptFilter = ref(0);
 const q = ref("");
+const showInactive = ref(false);
 
 const ready = ref(false);
 const loading = ref(false);
@@ -231,10 +238,11 @@ const rowsForActiveDate = computed(() =>
     attendance.value.filter((a) => a.log_date === selectedDate.value)
 );
 
-/* Combined rows: iterate only ACTIVE users */
+/* Combined rows: conditionally iterate over ACTIVE users or ALL users */
 const combinedRows = computed(() => {
   const presentMap = new Map(rowsForActiveDate.value.map((r) => [r.user_id, r]));
-  return activeUsers.value.map((u) => {
+  const baseUsers = showInactive.value ? users.value : activeUsers.value;
+  return baseUsers.map((u) => {
     const row = presentMap.get(u.user_id) || null;
     const dept = departmentById.value.get(u.user_department) || {};
     return {
@@ -249,6 +257,7 @@ const combinedRows = computed(() => {
       break_start: row?.break_start ?? null,
       break_end: row?.break_end ?? null,
       time_out: row?.time_out ?? null,
+      rawUser: u,
     };
   });
 });
@@ -394,7 +403,7 @@ onMounted(async () => {
   _nowTimer = setInterval(() => { nowTime.value = dayjs().format("h:mm:ss A"); }, 1000);
 });
 onUnmounted(() => { if (_nowTimer) clearInterval(_nowTimer); });
-watch([selectedDate, attendance, users], () => { if (currentUser.value) { ready.value = false; initEditState(); }});
+watch([selectedDate, attendance, users, showInactive], () => { if (currentUser.value) { ready.value = false; initEditState(); }});
 </script>
 
 <style scoped>
@@ -443,4 +452,21 @@ tbody tr:hover{background:#fafcff}
 /* Notices */
 .loading-note{padding:12px;color:#6b7280}
 .error-box{margin-top:12px;color:#b42318;background:#fef3f2;border:1px solid #fee2e2;border-radius:10px;padding:10px}
+
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
+}
 </style>
