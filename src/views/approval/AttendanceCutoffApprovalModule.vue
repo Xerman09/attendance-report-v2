@@ -85,7 +85,12 @@
         <div class="controls-bottom">
           <div class="field field--search">
             <label>Search Employee</label>
-            <input class="search-input" placeholder="Search by name / id" v-model="q" />
+            <div style="display: flex; gap: 8px;">
+              <input class="search-input" placeholder="Search by name / id" v-model="q" style="flex: 1;" />
+              <button type="button" class="btn secondary" @click="showInactive = !showInactive" style="height: 44px; min-width: max-content;">
+                {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+              </button>
+            </div>
           </div>
 
           <div class="field">
@@ -131,11 +136,17 @@
               v-for="e in filteredPendingEmployees"
               :key="e.user_id"
               class="emp-item"
-              :class="{ active: Number(selectedEmployeeId) === Number(e.user_id) }"
+              :class="{ 
+                active: Number(selectedEmployeeId) === Number(e.user_id),
+                'is-inactive': e.rawUser && !isActiveUser(e.rawUser)
+              }"
               @click="openEmployee(e)"
             >
               <div class="emp-item__row">
-                <div class="emp-item__name">{{ e.full_name }}</div>
+                <div class="emp-item__name">
+                  {{ e.full_name }}
+                  <span v-if="e.rawUser && !isActiveUser(e.rawUser)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
+                </div>
                 <span class="pill pill-warning">{{ e.pending_days }} pending</span>
               </div>
               <div class="emp-item__meta">
@@ -350,6 +361,7 @@ const cutoff = ref("26-10");
 const monthPick = ref(dayjs().format("YYYY-MM"));
 const departmentId = ref(0);
 const q = ref("");
+const showInactive = ref(false);
 
 /* Cutoff Range Calculation */
 const cutoffRange = computed(() => computeCutoffRange(monthPick.value, cutoff.value));
@@ -408,6 +420,11 @@ const selectedSchedule = computed(() => getScheduleForUser(selectedEmployeeId.va
 /* Filter Logic */
 const filteredPendingEmployees = computed(() => {
   let rows = Array.isArray(pendingEmployees.value) ? pendingEmployees.value : [];
+  
+  if (!showInactive.value) {
+    rows = rows.filter(e => !e.rawUser || isActiveUser(e.rawUser));
+  }
+
   if (q.value) {
     const needle = q.value.toLowerCase();
     rows = rows.filter((e) => {
@@ -554,11 +571,10 @@ async function loadPendingEmployees() {
       if (!uid) continue;
       const deptId = Number(l.department_id || 0);
       const u = userById.value.get(uid);
-      if (u && !isActiveUser(u)) continue;
       
       const name = u ? `${u.user_fname || ""} ${u.user_lname || ""}`.trim() : `User #${uid}`;
       if (!byUser.has(uid)) {
-        byUser.set(uid, { user_id: uid, full_name: name, department_id: deptId, pending_days: 0 });
+        byUser.set(uid, { user_id: uid, full_name: name, department_id: deptId, pending_days: 0, rawUser: u });
       }
       byUser.get(uid).pending_days += 1;
     }
@@ -1007,4 +1023,21 @@ select, input { width:100%; height:44px; padding:10px 12px; border:1px solid #e5
 }
 .empty-title{ font-weight:900; color:#111827; font-size:15px; }
 .empty-sub{ margin-top:6px; color:#6b7280; font-size:13px; }
+
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
+}
 </style>
