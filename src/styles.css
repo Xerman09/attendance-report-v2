@@ -21,6 +21,9 @@ a{color:inherit;text-decoration:none}
 .brand-text{display:flex;flex-direction:column;line-height:1.05}
 .brand-text small{color:var(--text-dim)}
 
+.close-sidebar-btn{background:transparent;border:none;color:var(--text-dim);cursor:pointer;margin-left:auto;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:6px;transition:all 0.2s}
+.close-sidebar-btn:hover{background:var(--border);color:var(--text)}
+
 /* Nav */
 nav{padding:8px;display:flex;flex-direction:column;gap:6px}
 .nav-item{width:100%;text-align:left;padding:10px 12px;border-radius:12px;background:transparent;border:1px solid transparent;color:var(--text)}

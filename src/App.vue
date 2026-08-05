@@ -1,6 +1,6 @@
 <template>
   <div class="layout">
-    <Sidebar :isOpen="sidebarOpen" />
+    <Sidebar :isOpen="sidebarOpen" @close="sidebarOpen = false" />
     <!-- shift content only when sidebar is open -->
     <div class="content" :class="{ shifted: sidebarOpen }">
       <header class="topbar no-print">

@@ -4,8 +4,12 @@
       <span class="logo">{{ logoText }}</span>
       <div class="brand-text">
         <strong>{{ companyName }}</strong>
-        <!-- <small>Attendance Report</small> -->
       </div>
+      <button class="close-sidebar-btn" @click="$emit('close')" aria-label="Hide sidebar" title="Hide sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
     </div>
     <nav>
       <!-- Attendance Report Menu -->
@@ -123,6 +127,7 @@
 <script setup>
 import { ref, computed } from "vue";
 defineProps({ isOpen: { type: Boolean, default: false } });
+defineEmits(['close']);
 
 const companyName = import.meta.env.VITE_COMPANY_NAME || "Attendance Report";
 const logoText = computed(() => {
