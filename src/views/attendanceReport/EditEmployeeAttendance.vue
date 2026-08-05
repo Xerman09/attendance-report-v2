@@ -64,11 +64,17 @@
 
           <div class="field field--search">
             <label>Search Employee</label>
-            <input
-              class="search-input"
-              placeholder="Search by name / department / id"
-              v-model="q"
-            />
+            <div style="display: flex; gap: 8px;">
+              <input
+                class="search-input"
+                placeholder="Search by name / department / id"
+                v-model="q"
+                style="flex: 1;"
+              />
+              <button class="btn secondary" @click="showInactive = !showInactive" style="height: 42px;">
+                {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -278,6 +284,7 @@ let _nowTimer;
 
 const q = ref("");
 const loading = ref(false);
+const showInactive = ref(false);
 
 /* ----- Active detection ----- */
 function isActiveUser(u) {
@@ -297,7 +304,7 @@ const userById = computed(() => new Map(users.value.map((u) => [u.user_id, u])))
 const departmentById = computed(() => new Map(departments.value.map((d) => [d.department_id, d])));
 
 const filteredActiveUsers = computed(() => {
-  let rows = activeUsers.value;
+  let rows = showInactive.value ? users.value : activeUsers.value;
 
   if (q.value) {
     const needle = q.value.toLowerCase();
@@ -322,7 +329,8 @@ const filteredActiveUsers = computed(() => {
 function formatUserLabel(u) {
   const dept = departmentById.value.get(u.user_department) || {};
   const name = `${u.user_fname || ""} ${u.user_lname || ""}`.trim();
-  return `${name} — ${dept.department_name || "No Dept"} (#${u.user_id})`;
+  const inactiveStr = isActiveUser(u) ? "" : " (Inactive)";
+  return `${name} — ${dept.department_name || "No Dept"} (#${u.user_id})${inactiveStr}`;
 }
 
 /* ===== Employee selection ===== */
@@ -795,6 +803,18 @@ select:disabled,
 input:disabled {
   background: #f9fafb;
   color: #9ca3af;
+}
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
 }
 .btn-wide {
   width: 100%;

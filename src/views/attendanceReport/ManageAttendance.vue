@@ -60,6 +60,9 @@
                 placeholder="Search by name or email"
                 v-model="q"
             />
+            <button class="btn secondary" @click="showInactive = !showInactive" style="margin-bottom: 0; min-width: max-content;">
+              {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+            </button>
           </div>
         </div>
       </div>
@@ -107,10 +110,13 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="row in displayRows" :key="row.key">
+          <tr v-for="row in displayRows" :key="row.key" :class="{ 'is-inactive': !isActiveUser(row.rawUser) }">
             <td>
               <div class="emp">
-                <div class="name">{{ row.empName }}</div>
+                <div class="name">
+                  {{ row.empName }}
+                  <span v-if="!isActiveUser(row.rawUser)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
+                </div>
                 <div class="dept">{{ row.deptName }}</div>
               </div>
             </td>
@@ -171,6 +177,7 @@ const presentFilter = ref("all");
 const punctualityFilter = ref("all");
 const deptFilter = ref(0);
 const q = ref("");
+const showInactive = ref(false);
 
 /** NEW: pick date (default = today PH) */
 const selectedDate = ref(dayjs().format("YYYY-MM-DD"));
@@ -208,6 +215,20 @@ function schedulePretty(sched) {
   if (!start || !end) return "";
   return `${prettyHM(start)} - ${prettyHM(end)}`;
 }
+
+/** Active detection */
+function isActiveUser(u) {
+  const v = u?.is_deleted;
+  if (v && typeof v === "object" && Array.isArray(v.data)) return Number(v.data?.[0] ?? 0) !== 1;
+  if (typeof v === "boolean") return v === false;
+  if (typeof v === "number") return v !== 1;
+  if (typeof v === "string") return v !== "1" && v.toLowerCase() !== "true";
+  return true;
+}
+
+const activeUsersList = computed(() => {
+  return Array.isArray(users.value) ? users.value.filter(isActiveUser) : [];
+});
 
 /** Indexers */
 const userById = computed(() => {
@@ -374,6 +395,7 @@ const presentActive = computed(() => {
         time_out_fmt: "",
         punctuality: "—",
         status: "Rest Day",
+        rawUser: user,
       };
     }
 
@@ -406,6 +428,7 @@ const presentActive = computed(() => {
       time_out_fmt: fmtTime(r.time_out),
       punctuality: r.time_in ? (stat.lateMinutes > 0 ? "Late" : "On Time") : "—",
       status: finalStatus,
+      rawUser: user,
     };
   });
 });
@@ -413,8 +436,9 @@ const presentActive = computed(() => {
 /** Build rows (not present) */
 const notPresentActive = computed(() => {
   const presentSet = new Set(rowsForActiveDate.value.map((r) => r.user_id));
+  const baseUsers = showInactive.value ? users.value : activeUsersList.value;
 
-  return users.value
+  return baseUsers
       .filter((u) => !presentSet.has(u.user_id))
       .map((u) => {
         const dept = departmentById.value.get(u.user_department) || {};
@@ -440,6 +464,7 @@ const notPresentActive = computed(() => {
             time_out_fmt: "",
             punctuality: "—",
             status: "Rest Day",
+            rawUser: u,
           };
         }
 
@@ -468,6 +493,7 @@ const notPresentActive = computed(() => {
             time_out_fmt: "",
             punctuality: "—",
             status: finalStatus,
+            rawUser: u,
           };
         }
 
@@ -486,6 +512,7 @@ const notPresentActive = computed(() => {
           time_out_fmt: "",
           punctuality: "—",
           status: finalStatus,
+          rawUser: u,
         };
       });
 });
@@ -743,4 +770,21 @@ tbody tr:hover { background: #fafcff; }
 /* Employee cell */
 .emp .name { font-weight: 600; line-height: 1.2; }
 .emp .dept { font-size: 12px; color: #667085; line-height: 1.2; }
+
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
+}
 </style>
