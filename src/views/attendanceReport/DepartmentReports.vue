@@ -64,6 +64,11 @@
           <label>Search by name</label>
           <input v-model="q" placeholder="Type a name..." />
         </div>
+        <div class="field" style="display: flex; align-items: flex-end;">
+          <button class="btn secondary" @click="showInactive = !showInactive" style="margin-bottom: 0;">
+            {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+          </button>
+        </div>
       </div>
 
       <!-- KPIs under filters -->
@@ -121,11 +126,12 @@
                 :key="r.key"
             >
             <tr
-                :class="{ 'row-consistent': r.consistentlyOnTime }"
+                :class="[{ 'row-consistent': r.consistentlyOnTime }, { 'is-inactive': r.rawUser && !isActiveUser(r.rawUser) }]"
             >
               <td class="col-name">
                 <div class="emp-name">
                   {{ r.empName || r.name || r.employee_name || "-" }}
+                  <span v-if="r.rawUser && !isActiveUser(r.rawUser)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
                 </div>
               </td>
               <td class="mono">
@@ -351,6 +357,7 @@ const startDate = ref(yesterdayStr.value);
 const endDate = ref(yesterdayStr.value);
 
 const q = ref("");
+const showInactive = ref(false);
 
 const printRef = ref(null);
 
@@ -453,9 +460,10 @@ watch([startDate, endDate], ([f, t]) => {
 });
 
 /* ---- only ACTIVE users in the chosen department ---- */
-const employeesInDept = computed(() =>
-    activeUsers.value.filter((u) => u.user_department === deptId.value)
-);
+const employeesInDept = computed(() => {
+    const list = showInactive.value ? (users.value || []) : activeUsers.value;
+    return list.filter((u) => u.user_department === deptId.value);
+});
 
 const dateList = computed(() => {
   const from = dayjs(startDate.value || minStartStr.value);
@@ -569,6 +577,7 @@ function buildRow(u, ymd) {
       overtimeMinutes: undefined,
       date: ymd,
       schedule: effSched,
+      rawUser: u,
     };
   }
 
@@ -584,6 +593,7 @@ function buildRow(u, ymd) {
       overtimeMinutes: undefined,
       date: ymd,
       schedule: effSched,
+      rawUser: u,
     };
   }
 
@@ -666,6 +676,7 @@ function buildRow(u, ymd) {
     time_out: rec.time_out,
     date: ymd,
     schedule: effSched,
+    rawUser: u,
   };
 }
 
@@ -1320,5 +1331,21 @@ input:focus, select:focus { border-color: #111827; }
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   transform-origin: center center;
+}
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
 }
 </style>
