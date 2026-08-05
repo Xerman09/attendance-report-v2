@@ -24,6 +24,11 @@
           <label>Search Employee</label>
           <input placeholder="Search by name or email" v-model="q" />
         </div>
+        <div>
+          <button class="secondary" @click="showInactive = !showInactive" style="margin-bottom: 0;">
+            {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+          </button>
+        </div>
       </div>
 
       <div class="spacer"></div>
@@ -38,10 +43,13 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="u in filteredEmployees" :key="u.user_id">
+          <tr v-for="u in filteredEmployees" :key="u.user_id" :class="{ 'is-inactive': !isActiveUser(u) }">
             <td>
               <div class="emp-cell">
-                <div class="emp-name">{{ u.user_fname }} {{ u.user_lname }}</div>
+                <div class="emp-name">
+                  {{ u.user_fname }} {{ u.user_lname }}
+                  <span v-if="!isActiveUser(u)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
+                </div>
                 <div class="emp-pos">{{ u.user_position || "—" }}</div>
               </div>
             </td>
@@ -73,6 +81,7 @@ const users = ref([]);
 const departments = ref([]);
 const department = ref(0);
 const q = ref("");
+const showInactive = ref(false);
 
 /* -------- Inactive detection (same rule as in Today's Attendance) -------- */
 function isActiveUser(u) {
@@ -100,7 +109,7 @@ const deptName = (id) => deptMap.value.get(id) || "";
 
 /* Use ACTIVE users for listing, search and department filtering */
 const filteredEmployees = computed(() => {
-  let rows = [...activeUsers.value];
+  let rows = showInactive.value ? [...(users.value || [])] : [...activeUsers.value];
   if (department.value) rows = rows.filter((u) => u.user_department === department.value);
   if (q.value) {
     const needle = q.value.toLowerCase();
@@ -163,5 +172,21 @@ onMounted(async () => {
 }
 .primary:hover {
   filter: brightness(1.05);
+}
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
 }
 </style>
