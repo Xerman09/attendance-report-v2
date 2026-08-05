@@ -49,6 +49,11 @@
           <label>Search Employee</label>
           <input type="text" v-model.trim="empSearch" placeholder="Type a name…" />
         </div>
+        <div class="field" style="display: flex; align-items: flex-end;">
+          <button class="btn secondary" @click="showInactive = !showInactive" style="margin-bottom: 0;">
+            {{ showInactive ? 'Hide Inactive' : 'Show Inactive' }}
+          </button>
+        </div>
         <div class="grow"></div>
       </div>
 
@@ -121,9 +126,12 @@
 
           <tbody>
           <template v-for="u in filteredUsers" :key="u.user_id">
-            <tr>
+            <tr :class="{ 'is-inactive': !isActiveUser(u) }">
               <td class="sticky-col name-col" :style="{ minWidth: nameMinPx }">
-                <div class="emp-name">{{ u.user_fname }} {{ u.user_lname }}</div>
+                <div class="emp-name">
+                  {{ u.user_fname }} {{ u.user_lname }}
+                  <span v-if="!isActiveUser(u)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
+                </div>
                 <div class="emp-meta"><span class="dept">{{ deptName(u.user_department) }}</span></div>
               </td>
 
@@ -261,6 +269,7 @@ const toDate = ref("");
 const deptFilter = ref(0);
 const empSearch = ref("");
 const hoursOnly = ref(false);
+const showInactive = ref(false);
 
 const showTotalWorking = ref(true);
 const showLate = ref(true);
@@ -511,9 +520,9 @@ function rowTotals(userId){
   return { w,l,o };
 }
 
-/* User filter (NOW excludes inactive users) */
+/* User filter (NOW conditionally includes inactive users) */
 const filteredUsersRaw = computed(() => {
-  let list = Array.isArray(users.value) ? users.value.filter(isActiveUser) : [];
+  let list = Array.isArray(users.value) ? (showInactive.value ? users.value : users.value.filter(isActiveUser)) : [];
   if (deptFilter.value) {
     list = list.filter(u => u?.user_department === deptFilter.value);
   }
@@ -829,4 +838,20 @@ watch([fromDate, toDate], ([f,t])=>{
 .modal-body{padding:12px;overflow:auto;background:#fff}
 .excel-preview table{border-collapse:collapse;width:100%;font-size:12.5px}
 .excel-preview th,.excel-preview td{border:1px solid #e5e7eb;padding:6px 8px;white-space:nowrap;text-align:center}
+.secondary {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.secondary:hover {
+  background: #e5e7eb;
+}
+.is-inactive {
+  opacity: 0.75;
+  background-color: #fef2f2 !important;
+}
 </style>
