@@ -3,34 +3,12 @@ import { api } from "./api";
 
 /**
  * "Login" by querying /items/user and comparing plaintext password.
- * - If you want to restrict to user 176 only, set RESTRICT_TO_ID_176=true.
+ * - Restricts login to users in a specific department (default: 2, or VITE_DEPARTMENT_ID).
  */
-const LOGIN_RESTRICTION_USER_ID = import.meta.env.VITE_LOGIN_RESTRICTION_USER_ID || null;
+const ALLOWED_DEPARTMENT_ID = import.meta.env.VITE_DEPARTMENT_ID || 2;
 
 export async function login(email, password) {
     if (!email || !password) throw new Error("Email and password are required.");
-
-    // If restricted to a single user:
-    if (LOGIN_RESTRICTION_USER_ID) {
-        const res = await api.get(`/items/user/${LOGIN_RESTRICTION_USER_ID}?fields=user_id,user_email,user_password,user_fname,user_lname,user_department`);
-        const u = res?.data?.data;
-        if (!u) throw new Error(`User ${LOGIN_RESTRICTION_USER_ID} not found.`);
-        if (String(u.user_email).trim().toLowerCase() !== String(email).trim().toLowerCase()) {
-            throw new Error(`Email does not match user ${LOGIN_RESTRICTION_USER_ID}.`);
-        }
-        if (String(u.user_password) !== String(password)) {
-            throw new Error("Invalid password.");
-        }
-        const currentUser = {
-            user_id: u.user_id,
-            user_email: u.user_email,
-            user_fname: u.user_fname,
-            user_lname: u.user_lname,
-            user_department: u.user_department,
-        };
-        localStorage.setItem("CURRENT_USER", JSON.stringify(currentUser));
-        return currentUser;
-    }
 
     // General lookup by email (Directus-style filters)
     const res = await api.get(
@@ -48,6 +26,10 @@ export async function login(email, password) {
     if (!user) throw new Error("User not found.");
     if (String(user.user_password) !== String(password)) {
         throw new Error("Invalid password.");
+    }
+
+    if (String(user.user_department) !== String(ALLOWED_DEPARTMENT_ID)) {
+        throw new Error("Access denied: User does not belong to the allowed department.");
     }
 
     const currentUser = {
