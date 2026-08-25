@@ -448,8 +448,9 @@ function cell(userId, ymd){
   const expectedEnd   = effectiveSched?.work_end   || "17:00:00";
 
   if(!log){ return { isRestDay:false, isAbsent:true, workMins:0, lateMins:0, overtimeMins:0, undertimeMins:0 }; }
+  const graceMins = effectiveSched?.grace_period != null ? Number(effectiveSched.grace_period) : 5;
 
-  const stat = computeStatus({ time_in: log.time_in, time_out: log.time_out, expectedStart, expectedEnd });
+  const stat = computeStatus({ time_in: log.time_in, time_out: log.time_out, expectedStart, expectedEnd, gracePeriod: graceMins });
 
   const startDJ = parseAnyTimeToDay(expectedStart);
   const endDJ   = parseAnyTimeToDay(expectedEnd);
@@ -465,7 +466,7 @@ function cell(userId, ymd){
   }
 
   const inDJ = parseAnyTimeToDay(log.time_in);
-  const grace = startDJ ? startDJ.add(5,"minute") : null;
+  const grace = startDJ ? startDJ.add(graceMins,"minute") : null;
   let lateFromIn=0;
   if(inDJ && grace && inDJ.isAfter(grace)){ lateFromIn = Math.max(0, Math.floor(inDJ.diff(grace,"second")/60)); }
 

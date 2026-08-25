@@ -143,6 +143,7 @@ import {
   fetchAttendance,
   fetchOnCallList,
   fetchOnCallSchedules,
+  fetchLeaveRequests,
 } from "../../services/api";
 import { fmtTime, computeStatus } from "../../utils/time";
 
@@ -150,6 +151,7 @@ const users = ref([]);
 const departments = ref([]);
 const schedules = ref([]);
 const attendance = ref([]);
+const leaves = ref([]);
 
 /* on-call datasets */
 const onCallList = ref([]);
@@ -186,6 +188,7 @@ function statusChip(s) {
   if (s === "Absent") return "danger";
   if (s === "Rest Day") return "info";
   if (s === "On Call") return "oncall";
+  if (s && s.includes("Leave")) return s.includes("Approved") ? "success" : (s.includes("Pending") ? "warn" : "danger");
   return "";
 }
 
@@ -301,6 +304,23 @@ const todayStr = computed(() => dayjs().format("dddd - MMM D, YYYY"));
 const todayYMD = computed(() => dayjs().format("YYYY-MM-DD"));
 const todayRows = computed(() => attendance.value.filter((a) => a.log_date === todayYMD.value));
 
+function getLeaveStatusForToday(userId) {
+  const today = dayjs(todayYMD.value, "YYYY-MM-DD");
+  const userLeaves = leaves.value.filter((l) => Number(l.user_id) === Number(userId));
+  for (const lv of userLeaves) {
+    if (!lv.leave_start) continue;
+    const start = dayjs(lv.leave_start, "YYYY-MM-DD").startOf('day');
+    const end = lv.leave_end ? dayjs(lv.leave_end, "YYYY-MM-DD").endOf('day') : start.endOf('day');
+    
+    if ((today.isAfter(start) || today.isSame(start, 'day')) && (today.isBefore(end) || today.isSame(end, 'day'))) {
+      if (lv.status === 'approved') return 'Leave (Approved)';
+      if (lv.status === 'pending') return 'Absent (Pending Leave)';
+      if (lv.status === 'rejected') return 'Absent (Rejected Leave)';
+    }
+  }
+  return null;
+}
+
 /* Effective schedule for TODAY */
 function getEffectiveScheduleForToday(userId) {
   const rows = onCallRowsByUserId.value.get(Number(userId)) || [];
@@ -363,16 +383,23 @@ const presentToday = computed(() => {
 
         const expectedStart = effectiveSched.work_start || effectiveSched.start_time || "09:00:00";
         const expectedEnd = effectiveSched.work_end || effectiveSched.end_time || "18:00:00";
+        const graceMins = effectiveSched.grace_period != null ? Number(effectiveSched.grace_period) : 5;
 
         const stat = computeStatus({
           time_in: r.time_in,
           time_out: r.time_out,
           expectedStart,
           expectedEnd,
+          gracePeriod: graceMins,
         });
 
         const baseStatus = r.time_in ? "Present" : "Absent";
-        const finalStatus = source === "oncall" ? "On Call" : baseStatus;
+        let finalStatus = source === "oncall" ? "On Call" : baseStatus;
+        
+        const leaveStatus = getLeaveStatusForToday(r.user_id);
+        if (leaveStatus && finalStatus !== "Present") {
+          finalStatus = leaveStatus;
+        }
 
         return {
           key: `p-${r.user_id}`,
@@ -431,7 +458,12 @@ const notPresentToday = computed(() => {
           const cutoff = dayjs(`${todayYMD.value}T${lunchEnd}`);
           const now = dayjs();
           const baseStatus = now.isAfter(cutoff) ? "Absent" : "Not Present";
-          const finalStatus = source === "oncall" ? "On Call" : baseStatus;
+          let finalStatus = source === "oncall" ? "On Call" : baseStatus;
+          
+          const leaveStatus = getLeaveStatusForToday(u.user_id);
+          if (leaveStatus) {
+            finalStatus = leaveStatus;
+          }
 
           return {
             key: `np-${u.user_id}`,
@@ -450,7 +482,11 @@ const notPresentToday = computed(() => {
           };
         }
 
-        const finalStatus = source === "oncall" ? "On Call" : "Not Present";
+        let finalStatus = source === "oncall" ? "On Call" : "Not Present";
+        const leaveStatus = getLeaveStatusForToday(u.user_id);
+        if (leaveStatus) {
+          finalStatus = leaveStatus;
+        }
         return {
           key: `np-${u.user_id}`,
           user_id: u.user_id,
@@ -481,8 +517,8 @@ const kpiCounts = computed(() => {
   const rows = kpiFilteredRows.value;
   return {
     present: rows.filter((r) => r.status === "Present").length,
-    absent: rows.filter((r) => r.status === "Absent").length,
-    restDay: rows.filter((r) => r.status === "Rest Day").length,
+    absent: rows.filter((r) => r.status.includes("Absent")).length,
+    restDay: rows.filter((r) => r.status === "Rest Day" || r.status.includes("Leave")).length,
     onTime: rows.filter((r) => r.status === "Present" && r.punctuality === "On Time").length,
     late: rows.filter((r) => r.status === "Present" && r.punctuality === "Late").length,
   };
@@ -490,8 +526,8 @@ const kpiCounts = computed(() => {
 
 /* Totals & display */
 const absentTotal = computed(() => {
-  const a1 = presentToday.value.filter((r) => r.status === "Absent").length;
-  const a2 = notPresentToday.value.filter((r) => r.status === "Absent").length;
+  const a1 = presentToday.value.filter((r) => r.status.includes("Absent")).length;
+  const a2 = notPresentToday.value.filter((r) => r.status.includes("Absent")).length;
   return a1 + a2;
 });
 
@@ -501,8 +537,8 @@ const displayRows = computed(() => {
     rows = presentToday.value.filter((r) => r.status === "Present");
   } else if (presentFilter.value === "absent") {
     rows = [
-      ...presentToday.value.filter((r) => r.status === "Absent"),
-      ...notPresentToday.value.filter((r) => r.status === "Absent"),
+      ...presentToday.value.filter((r) => r.status.includes("Absent")),
+      ...notPresentToday.value.filter((r) => r.status.includes("Absent")),
     ];
   } else if (presentFilter.value === "not_present") {
     rows = notPresentToday.value.filter((r) => r.status === "Not Present");
@@ -548,6 +584,7 @@ async function loadAll() {
     fetchAttendance(),
     fetchOnCallList(),
     fetchOnCallSchedules(),
+    fetchLeaveRequests(),
   ]);
   users.value = u;
   departments.value = d;
@@ -555,6 +592,7 @@ async function loadAll() {
   attendance.value = a;
   onCallList.value = ocList;
   onCallSchedules.value = ocScheds;
+  leaves.value = lv;
 }
 async function refreshAttendance() {
   try {

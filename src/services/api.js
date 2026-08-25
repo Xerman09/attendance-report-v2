@@ -139,6 +139,11 @@ export const fetchOnCallSchedules = async () => {
   return data?.data ?? [];
 };
 
+export const fetchLeaveRequests = async () => {
+  const { data } = await api.get("/items/leave_request?limit=-1");
+  return data?.data ?? [];
+};
+
 /* ---------- WRITE ---------- */
 
 export const updateAttendanceLog = async (logId, payload) => {

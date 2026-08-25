@@ -600,11 +600,14 @@ function buildRow(u, ymd) {
   const expectedStart = effSched?.work_start || "08:00:00";
   const expectedEnd = effSched?.work_end || "17:00:00";
 
+  const graceMins = effSched?.grace_period != null ? Number(effSched.grace_period) : 5;
+
   const stat = computeStatus({
     time_in: rec.time_in,
     time_out: rec.time_out,
     expectedStart,
     expectedEnd,
+    gracePeriod: graceMins,
   });
 
   const baseDate = String(ymd);
@@ -625,7 +628,8 @@ function buildRow(u, ymd) {
   }
 
   const inDJ = parseHM(baseDate, rec.time_in);
-  const grace = schedStart ? schedStart.add(5, "minute") : null;
+  const graceMins = effSched?.grace_period != null ? Number(effSched.grace_period) : 5;
+  const grace = schedStart ? schedStart.add(graceMins, "minute") : null;
   let lateFromIn = 0;
   if (inDJ && grace && inDJ.isAfter(grace)) {
     lateFromIn = Math.max(0, Math.floor(inDJ.diff(grace, "second") / 60));

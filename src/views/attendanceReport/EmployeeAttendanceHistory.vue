@@ -596,10 +596,12 @@ const rows = computed(() => {
     const weekdayIdx = dayjs(dayISO).day();
     const isRest = source !== "oncall" ? !workingSet.has(weekdayIdx) : false;
 
+    const graceMins = effSched?.grace_period != null ? Number(effSched.grace_period) : 5;
+
     const baseStat =
       isRest || l.status === "Rest Day" || l.status === "Prehire"
         ? { totalMinutes: 0, lateMinutes: 0, overtimeMinutes: 0, status: "Rest Day" }
-        : computeStatus({ time_in: l.time_in, time_out: l.time_out, expectedStart, expectedEnd });
+        : computeStatus({ time_in: l.time_in, time_out: l.time_out, expectedStart, expectedEnd, gracePeriod: graceMins });
 
     const outPretty = l.time_out
       ? fmtTime(l.time_out)
@@ -638,7 +640,7 @@ const rows = computed(() => {
     const actualIn = parseHM(dayISO, l.time_in ? fmtTime(l.time_in) : null) || parseHM(dayISO, l.time_in);
 
     if (!isRest) {
-      const graceTime = schedStart ? schedStart.add(5, "minute") : null;
+      const graceTime = schedStart ? schedStart.add(graceMins, "minute") : null;
       if (graceTime && actualIn && actualIn.isAfter(graceTime)) customLateMinutes += actualIn.diff(graceTime, "minute");
 
       const actualLunchStart = parseHM(dayISO, lunchStartRaw);

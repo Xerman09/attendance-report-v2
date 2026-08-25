@@ -41,7 +41,7 @@ export function displayTimeOutWhenMissing({ log_date, expectedStart }){
  * - 5-minute grace after work start for lateness.
  * - Overtime counts if >= 90 minutes beyond expected end; overtime status overrides.
  */
-export function computeStatus({ time_in, time_out, expectedStart, expectedEnd }){
+export function computeStatus({ time_in, time_out, expectedStart, expectedEnd, gracePeriod = 5 }){
   expectedStart = safeTime(expectedStart);
   expectedEnd   = safeEnd(expectedEnd);
 
@@ -53,8 +53,7 @@ export function computeStatus({ time_in, time_out, expectedStart, expectedEnd })
   // Missing timeout case
   if(time_in && !time_out){
     const lateRaw = computeLateMinutes(time_in, expectedStart);
-    const grace = 5;
-    const late = Math.max(0, lateRaw - grace);
+    const late = Math.max(0, lateRaw - gracePeriod);
     const status = late > 0 ? 'Late' : 'On Time';
     return { totalMinutes: 240, lateMinutes: late, overtimeMinutes: 0, status };
   }
@@ -78,9 +77,8 @@ export function computeStatus({ time_in, time_out, expectedStart, expectedEnd })
   const overtimeRaw = Math.max(0, outTime.diff(endSched,'minute'));
   const overtime = overtimeRaw >= 90 ? overtimeRaw : 0;
 
-  // 5-minute grace period
-  const grace = 5;
-  const late = Math.max(0, lateRaw - grace);
+  // Grace period
+  const late = Math.max(0, lateRaw - gracePeriod);
 
   let status = 'On Time';
   if(late > 0) status = 'Late';
