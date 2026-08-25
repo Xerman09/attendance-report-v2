@@ -390,6 +390,8 @@ const presentToday = computed(() => {
           time_out: r.time_out,
           expectedStart,
           expectedEnd,
+          lunchStart: effectiveSched.lunch_start,
+          lunchEnd: effectiveSched.lunch_end,
           gracePeriod: graceMins,
         });
 

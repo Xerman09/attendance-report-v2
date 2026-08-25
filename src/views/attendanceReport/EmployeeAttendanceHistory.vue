@@ -601,7 +601,15 @@ const rows = computed(() => {
     const baseStat =
       isRest || l.status === "Rest Day" || l.status === "Prehire"
         ? { totalMinutes: 0, lateMinutes: 0, overtimeMinutes: 0, status: "Rest Day" }
-        : computeStatus({ time_in: l.time_in, time_out: l.time_out, expectedStart, expectedEnd, gracePeriod: graceMins });
+        : computeStatus({
+            time_in: l.time_in,
+            time_out: l.time_out,
+            expectedStart,
+            expectedEnd,
+            lunchStart: effSched?.lunch_start,
+            lunchEnd: effSched?.lunch_end,
+            gracePeriod: graceMins
+          });
 
     const outPretty = l.time_out
       ? fmtTime(l.time_out)

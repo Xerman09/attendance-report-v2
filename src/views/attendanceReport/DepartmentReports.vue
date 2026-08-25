@@ -607,6 +607,8 @@ function buildRow(u, ymd) {
     time_out: rec.time_out,
     expectedStart,
     expectedEnd,
+    lunchStart: effSched?.lunch_start,
+    lunchEnd: effSched?.lunch_end,
     gracePeriod: graceMins,
   });
 
@@ -628,7 +630,6 @@ function buildRow(u, ymd) {
   }
 
   const inDJ = parseHM(baseDate, rec.time_in);
-  const graceMins = effSched?.grace_period != null ? Number(effSched.grace_period) : 5;
   const grace = schedStart ? schedStart.add(graceMins, "minute") : null;
   let lateFromIn = 0;
   if (inDJ && grace && inDJ.isAfter(grace)) {

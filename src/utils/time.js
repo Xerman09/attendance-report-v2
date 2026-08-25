@@ -39,9 +39,9 @@ export function displayTimeOutWhenMissing({ log_date, expectedStart }){
  * - If no time_in: Absent.
  * - If time_in exists but no time_out: show total 240 min placeholder and evaluate status using grace.
  * - 5-minute grace after work start for lateness.
- * - Overtime counts if >= 90 minutes beyond expected end; overtime status overrides.
+ * - Overtime counts any time after expectedEnd, deducting scheduled lunch if it overlaps.
  */
-export function computeStatus({ time_in, time_out, expectedStart, expectedEnd, gracePeriod = 5 }){
+export function computeStatus({ time_in, time_out, expectedStart, expectedEnd, lunchStart, lunchEnd, gracePeriod = 5 }){
   expectedStart = safeTime(expectedStart);
   expectedEnd   = safeEnd(expectedEnd);
 
@@ -75,7 +75,31 @@ export function computeStatus({ time_in, time_out, expectedStart, expectedEnd, g
   }
 
   const overtimeRaw = Math.max(0, outTime.diff(endSched,'minute'));
-  const overtime = overtimeRaw >= 90 ? overtimeRaw : 0;
+  
+  let lunchDeduct = 0;
+  if (lunchStart && lunchEnd && overtimeRaw > 0) {
+    let lStart = dayjs(inTime.format('YYYY-MM-DD') + 'T' + safeTime(lunchStart));
+    let lEnd = dayjs(inTime.format('YYYY-MM-DD') + 'T' + safeTime(lunchEnd));
+    
+    // Handle overnight lunch shifts if any
+    if (safeTime(lunchEnd) < safeTime(lunchStart)) {
+      lEnd = lEnd.add(1, 'day');
+    }
+    if (safeTime(lunchStart) < safeTime(expectedStart)) {
+      lStart = lStart.add(1, 'day');
+      lEnd = lEnd.add(1, 'day');
+    }
+
+    if (lEnd.isAfter(endSched)) {
+       const overlapStart = lStart.isAfter(endSched) ? lStart : endSched;
+       const overlapEnd = outTime.isBefore(lEnd) ? outTime : lEnd;
+       if (overlapEnd.isAfter(overlapStart)) {
+         lunchDeduct = overlapEnd.diff(overlapStart, 'minute');
+       }
+    }
+  }
+
+  const overtime = Math.max(0, overtimeRaw - lunchDeduct);
 
   // Grace period
   const late = Math.max(0, lateRaw - gracePeriod);

@@ -450,7 +450,15 @@ function cell(userId, ymd){
   if(!log){ return { isRestDay:false, isAbsent:true, workMins:0, lateMins:0, overtimeMins:0, undertimeMins:0 }; }
   const graceMins = effectiveSched?.grace_period != null ? Number(effectiveSched.grace_period) : 5;
 
-  const stat = computeStatus({ time_in: log.time_in, time_out: log.time_out, expectedStart, expectedEnd, gracePeriod: graceMins });
+  const stat = computeStatus({
+    time_in: log.time_in,
+    time_out: log.time_out,
+    expectedStart,
+    expectedEnd,
+    lunchStart: effectiveSched?.lunch_start,
+    lunchEnd: effectiveSched?.lunch_end,
+    gracePeriod: graceMins
+  });
 
   const startDJ = parseAnyTimeToDay(expectedStart);
   const endDJ   = parseAnyTimeToDay(expectedEnd);
