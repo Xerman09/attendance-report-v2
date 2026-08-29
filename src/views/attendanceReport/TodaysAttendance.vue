@@ -263,7 +263,11 @@ function statusChip(s) {
   if (s === "Absent") return "danger";
   if (s === "Rest Day") return "info";
   if (s === "On Call") return "oncall";
-  if (s && s.includes("Leave")) return s.includes("Approved") ? "success" : (s.includes("Pending") ? "warn" : "danger");
+  if (s && s.includes("Leave")) {
+    if (s.includes("Pending")) return "warn";
+    if (s.includes("Rejected")) return "danger";
+    return "success";
+  }
   return "";
 }
 
@@ -388,7 +392,7 @@ function getLeaveStatusForToday(userId) {
     const end = lv.leave_end ? dayjs(lv.leave_end, "YYYY-MM-DD").endOf('day') : start.endOf('day');
     
     if ((today.isAfter(start) || today.isSame(start, 'day')) && (today.isBefore(end) || today.isSame(end, 'day'))) {
-      if (lv.status === 'approved') return { text: 'Leave (Approved)', leave: lv };
+      if (lv.status === 'approved') return { text: 'Leave', leave: lv };
       if (lv.status === 'pending') return { text: 'Leave (Pending)', leave: lv };
       if (lv.status === 'rejected') return { text: 'Absent (Rejected Leave)', leave: lv };
     }
