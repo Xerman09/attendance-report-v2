@@ -330,7 +330,7 @@ function getLeaveStatusForToday(userId) {
     
     if ((today.isAfter(start) || today.isSame(start, 'day')) && (today.isBefore(end) || today.isSame(end, 'day'))) {
       if (lv.status === 'approved') return 'Leave (Approved)';
-      if (lv.status === 'pending') return 'Absent (Pending Leave)';
+      if (lv.status === 'pending') return 'Leave (Pending)';
       if (lv.status === 'rejected') return 'Absent (Rejected Leave)';
     }
   }
@@ -595,7 +595,7 @@ const displayRows = computed(() => {
 
 /* Data load & auto-refresh */
 async function loadAll() {
-  const [u, d, s, a, ocList, ocScheds] = await Promise.all([
+  const [u, d, s, a, ocList, ocScheds, lv] = await Promise.all([
     fetchUsers(),
     fetchDepartments(),
     fetchSchedules(),
