@@ -118,9 +118,20 @@
             <td>{{ row.time_out_fmt || "—" }}</td>
             <td>{{ row.punctuality || "—" }}</td>
             <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="chip" :class="statusChip(row.status)">
                   {{ row.status }}
                 </span>
+                <button
+                  v-if="row.leaveObj"
+                  class="btn-icon"
+                  title="View Leave Details"
+                  @click="openLeaveModal(row.leaveObj)"
+                  style="background:none; border:none; cursor:pointer; color:#667085; display:flex; align-items:center;"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
             </td>
           </tr>
           <tr v-if="displayRows.length === 0">
@@ -128,6 +139,43 @@
           </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+    
+    <!-- Leave Details Modal -->
+    <div v-if="showLeaveModal" class="modal-backdrop" @click="closeLeaveModal">
+      <div class="modal" @click.stop>
+        <div class="modal-header">
+          <h3>Leave Details</h3>
+          <button class="btn-icon" @click="closeLeaveModal" style="background:none;border:none;cursor:pointer;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="modal-body" v-if="selectedLeave">
+          <div class="detail-row">
+            <strong>Type:</strong> <span style="text-transform: capitalize;">{{ selectedLeave.leave_type }}</span>
+          </div>
+          <div class="detail-row">
+            <strong>Start:</strong> {{ selectedLeave.leave_start }}
+          </div>
+          <div class="detail-row">
+            <strong>End:</strong> {{ selectedLeave.leave_end || selectedLeave.leave_start }}
+          </div>
+          <div class="detail-row">
+            <strong>Total Days:</strong> {{ selectedLeave.total_days }}
+          </div>
+          <div class="detail-row">
+            <strong>Status:</strong> <span style="text-transform: capitalize;">{{ selectedLeave.status }}</span>
+          </div>
+          <div class="detail-row">
+            <strong>Reason:</strong>
+            <p style="margin-top: 4px; white-space: pre-wrap; background: #f9fafb; padding: 8px; border-radius: 4px; font-size: 14px; border: 1px solid #e5e7eb;">{{ selectedLeave.reason || 'N/A' }}</p>
+          </div>
+          <div class="detail-row" v-if="selectedLeave.remarks">
+            <strong>Remarks:</strong>
+            <p style="margin-top: 4px; white-space: pre-wrap; background: #f9fafb; padding: 8px; border-radius: 4px; font-size: 14px; border: 1px solid #e5e7eb;">{{ selectedLeave.remarks }}</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -165,6 +213,17 @@ const presentFilter = ref("all");
 const punctualityFilter = ref("all");
 const deptFilter = ref(0);
 const q = ref("");
+const selectedLeave = ref(null);
+const showLeaveModal = ref(false);
+
+function openLeaveModal(leave) {
+  selectedLeave.value = leave;
+  showLeaveModal.value = true;
+}
+function closeLeaveModal() {
+  showLeaveModal.value = false;
+  selectedLeave.value = null;
+}
 
 /* -------- INACTIVE USER HANDLING -------- */
 function isActiveUser(u) {
@@ -329,9 +388,9 @@ function getLeaveStatusForToday(userId) {
     const end = lv.leave_end ? dayjs(lv.leave_end, "YYYY-MM-DD").endOf('day') : start.endOf('day');
     
     if ((today.isAfter(start) || today.isSame(start, 'day')) && (today.isBefore(end) || today.isSame(end, 'day'))) {
-      if (lv.status === 'approved') return 'Leave (Approved)';
-      if (lv.status === 'pending') return 'Leave (Pending)';
-      if (lv.status === 'rejected') return 'Absent (Rejected Leave)';
+      if (lv.status === 'approved') return { text: 'Leave (Approved)', leave: lv };
+      if (lv.status === 'pending') return { text: 'Leave (Pending)', leave: lv };
+      if (lv.status === 'rejected') return { text: 'Absent (Rejected Leave)', leave: lv };
     }
   }
   return null;
@@ -413,10 +472,14 @@ const presentToday = computed(() => {
 
         const baseStatus = r.time_in ? "Present" : "Absent";
         let finalStatus = source === "oncall" ? "On Call" : baseStatus;
+        let leaveObj = null;
         
-        const leaveStatus = getLeaveStatusForToday(r.user_id);
-        if (leaveStatus && finalStatus !== "Present") {
-          finalStatus = leaveStatus;
+        const leaveData = getLeaveStatusForToday(r.user_id);
+        if (leaveData) {
+          if (finalStatus !== "Present") {
+            finalStatus = leaveData.text;
+          }
+          leaveObj = leaveData.leave;
         }
 
         return {
@@ -433,6 +496,7 @@ const presentToday = computed(() => {
           time_out_fmt: fmtTime(r.time_out),
           punctuality: r.time_in ? (stat.lateMinutes > 0 ? "Late" : "On Time") : "—",
           status: finalStatus,
+          leaveObj: leaveObj,
         };
       });
 });
@@ -477,10 +541,12 @@ const notPresentToday = computed(() => {
           const now = dayjs();
           const baseStatus = now.isAfter(cutoff) ? "Absent" : "Not Present";
           let finalStatus = source === "oncall" ? "On Call" : baseStatus;
+          let leaveObj = null;
           
-          const leaveStatus = getLeaveStatusForToday(u.user_id);
-          if (leaveStatus) {
-            finalStatus = leaveStatus;
+          const leaveData = getLeaveStatusForToday(u.user_id);
+          if (leaveData) {
+            finalStatus = leaveData.text;
+            leaveObj = leaveData.leave;
           }
 
           return {
@@ -497,14 +563,19 @@ const notPresentToday = computed(() => {
             time_out_fmt: "",
             punctuality: "—",
             status: finalStatus,
+            leaveObj: leaveObj,
           };
         }
 
         let finalStatus = source === "oncall" ? "On Call" : "Not Present";
-        const leaveStatus = getLeaveStatusForToday(u.user_id);
-        if (leaveStatus) {
-          finalStatus = leaveStatus;
+        let leaveObj = null;
+        
+        const leaveData = getLeaveStatusForToday(u.user_id);
+        if (leaveData) {
+          finalStatus = leaveData.text;
+          leaveObj = leaveData.leave;
         }
+        
         return {
           key: `np-${u.user_id}`,
           user_id: u.user_id,
@@ -519,6 +590,7 @@ const notPresentToday = computed(() => {
           time_out_fmt: "",
           punctuality: "—",
           status: finalStatus,
+          leaveObj: leaveObj,
         };
       });
 });
@@ -766,6 +838,14 @@ tbody tr:hover { background: #fafcff; }
 .chip.danger  { background: #fef3f2; color: #b42318; }
 .chip.info    { background: #f3f4f6; color: #374151; }
 .chip.oncall  { background: #e0f2fe; color: #075985; }
+
+/* Modal */
+.modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.modal { background: #fff; border-radius: 8px; width: 90%; max-width: 500px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 16px; }
+.modal-header h3 { margin: 0; font-size: 18px; color: #111827; }
+.detail-row { margin-bottom: 12px; font-size: 14px; color: #374151; }
+.detail-row strong { color: #111827; margin-right: 4px; }
 
 /* Employee cell */
 .emp .name { font-weight: 600; line-height: 1.2; }
