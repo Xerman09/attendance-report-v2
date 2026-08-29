@@ -168,14 +168,30 @@ const q = ref("");
 
 /* -------- INACTIVE USER HANDLING -------- */
 function isActiveUser(u) {
-  const v = u?.is_deleted;
-  if (v && typeof v === "object" && Array.isArray(v.data)) {
-    // Directus Buffer style
-    return Number(v.data?.[0] ?? 0) !== 1;
+  // 1. Must be an employee
+  const isEmp = u?.is_employee;
+  if (isEmp !== undefined && isEmp !== null) {
+    if (typeof isEmp === "boolean" && isEmp === false) return false;
+    if (typeof isEmp === "number" && isEmp === 0) return false;
+    if (typeof isEmp === "string" && (isEmp === "0" || isEmp.toLowerCase() === "false")) return false;
   }
-  if (typeof v === "boolean") return v === false;
-  if (typeof v === "number") return v !== 1;
-  if (typeof v === "string") return v !== "1" && v.toLowerCase() !== "true";
+
+  // 2. Must not be deleted (either one could be 1)
+  const isFieldDeleted = (v) => {
+    if (v && typeof v === "object" && Array.isArray(v.data)) {
+      // Directus Buffer style
+      return Number(v.data?.[0] ?? 0) === 1;
+    }
+    if (typeof v === "boolean") return v === true;
+    if (typeof v === "number") return v === 1;
+    if (typeof v === "string") return v === "1" || v.toLowerCase() === "true";
+    return false;
+  };
+
+  if (isFieldDeleted(u?.is_deleted) || isFieldDeleted(u?.isDeleted)) {
+    return false; // User is deleted
+  }
+  
   // If field missing, assume active
   return true;
 }
