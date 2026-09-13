@@ -249,6 +249,10 @@
                     <label>Under</label>
                     <input type="number" min="0" v-model.number="edit[r._key].undertime_minutes" />
                   </div>
+                  <div class="input-group">
+                    <label>Over</label>
+                    <input type="number" min="0" v-model.number="edit[r._key].overtime_minutes" />
+                  </div>
                   <div class="input-group grow">
                     <label>Remarks</label>
                     <input type="text" placeholder="Optional remarks..." v-model="edit[r._key].remarks" @click.stop />
@@ -294,6 +298,7 @@ import {
   fetchSchedules,
   fetchUserSchedules,
   fetchAttendanceApprovalsByEmployeeRange,
+  fetchOvertimeRequestsByEmployeeRange,
   createAttendanceApproval,
   updateAttendanceApproval,
   updateAttendanceLog,
@@ -460,7 +465,7 @@ function initEditState() {
       work_minutes: clampNonNegInt(r.work_minutes),
       late_minutes: clampNonNegInt(r.late_minutes),
       undertime_minutes: clampNonNegInt(r.undertime_minutes),
-      overtime_minutes: 0,
+      overtime_minutes: clampNonNegInt(r.overtime_minutes),
       remarks: r.remarks ?? "",
       status: r.status ?? "approved",
     };
@@ -473,7 +478,7 @@ function resetRowEdits(r) {
     work_minutes: clampNonNegInt(r.work_minutes),
     late_minutes: clampNonNegInt(r.late_minutes),
     undertime_minutes: clampNonNegInt(r.undertime_minutes),
-    overtime_minutes: 0,
+    overtime_minutes: clampNonNegInt(r.overtime_minutes),
     remarks: r.remarks ?? "",
     status: r.status ?? "approved",
   };
@@ -628,7 +633,7 @@ async function bulkSetStatus(status) {
         work_minutes: clampNonNegInt(e.work_minutes),
         late_minutes: clampNonNegInt(e.late_minutes),
         undertime_minutes: clampNonNegInt(e.undertime_minutes),
-        overtime_minutes: 0,
+        overtime_minutes: clampNonNegInt(e.overtime_minutes),
         remarks: (e.remarks ?? "").trim() || null,
         status: status, // Applying the bulk status (approved/rejected)
       };
@@ -665,9 +670,10 @@ async function loadEmployeeRows() {
   tableLoading.value = true;
   try {
     const dates = buildDateList(rangeFrom.value, rangeTo.value);
-    const [approvals, logs] = await Promise.all([
+    const [approvals, logs, overtimes] = await Promise.all([
       fetchAttendanceApprovalsByEmployeeRange(selectedEmployeeId.value, rangeFrom.value, rangeTo.value),
       fetchAttendanceByEmployeeRange_SAFE(selectedEmployeeId.value, rangeFrom.value, rangeTo.value),
+      fetchOvertimeRequestsByEmployeeRange(selectedEmployeeId.value, rangeFrom.value, rangeTo.value),
     ]);
 
     const apprByDate = new Map();
@@ -676,24 +682,30 @@ async function loadEmployeeRows() {
     const logByDate = new Map();
     for (const l of logs || []) logByDate.set(String(l.log_date), l);
     
+    const otByDate = new Map();
+    for (const ot of overtimes || []) otByDate.set(String(ot.request_date), ot);
+    
     const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(selectedEmployeeDeptId.value);
 
     const allRows = dates.map((d) => {
       const a = apprByDate.get(d) || null;
       const l = logByDate.get(d) || null;
+      const otReq = otByDate.get(d) || null;
       const approvalId = a?.approval_id ?? a?.id ?? null;
 
       // START: Computation Logic
       let work_minutes = Number(a?.work_minutes ?? 0);
       let late_minutes = Number(a?.late_minutes ?? 0);
       let undertime_minutes = Number(a?.undertime_minutes ?? 0);
+      let overtime_minutes = Number(a?.overtime_minutes ?? 0);
 
       // If values are 0 OR the record is missing, compute from logs
-      if (l && (!approvalId || (work_minutes === 0 && late_minutes === 0 && undertime_minutes === 0))) {
-        const computed = computeApprovalMinutes(d, l, schedule);
+      if (l && (!approvalId || (work_minutes === 0 && late_minutes === 0 && undertime_minutes === 0 && overtime_minutes === 0))) {
+        const computed = computeApprovalMinutes(d, l, schedule, otReq);
         work_minutes = computed.work_minutes;
         late_minutes = computed.late_minutes;
         undertime_minutes = computed.undertime_minutes;
+        overtime_minutes = computed.overtime_minutes;
       }
 
       return {
@@ -706,9 +718,11 @@ async function loadEmployeeRows() {
         work_minutes,
         late_minutes,
         undertime_minutes,
+        overtime_minutes,
         log_id: l?.log_id ?? null,
         log_approve_status: l?.approve_status ?? null,
         logRow: l,
+        otReq,
         no_log: !l,
       };
     });
@@ -730,8 +744,8 @@ async function recomputeRow(r) {
   try {
     if (!r?.log_id) return;
     const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(r.department_id || selectedEmployeeDeptId.value);
-    const computed = computeApprovalMinutes(r.date_schedule, r.logRow, schedule);
-    edit.value[r._key] = { ...(edit.value[r._key] || {}), ...computed, overtime_minutes: 0 };
+    const computed = computeApprovalMinutes(r.date_schedule, r.logRow, schedule, r.otReq);
+    edit.value[r._key] = { ...(edit.value[r._key] || {}), ...computed };
   } catch (err) { console.error(err); }
 }
 
@@ -741,8 +755,8 @@ async function recomputeAll() {
     const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(selectedEmployeeDeptId.value);
     for (const r of dateRows.value) {
       if (!r.log_id) continue;
-      const computed = computeApprovalMinutes(r.date_schedule, r.logRow, schedule);
-      edit.value[r._key] = { ...(edit.value[r._key] || {}), ...computed, overtime_minutes: 0 };
+      const computed = computeApprovalMinutes(r.date_schedule, r.logRow, schedule, r.otReq);
+      edit.value[r._key] = { ...(edit.value[r._key] || {}), ...computed };
     }
   } finally { bulkSaving.value = false; }
 }
@@ -768,7 +782,7 @@ async function saveApprovalRow(row) {
       work_minutes: clampNonNegInt(e.work_minutes),
       late_minutes: clampNonNegInt(e.late_minutes),
       undertime_minutes: clampNonNegInt(e.undertime_minutes),
-      overtime_minutes: 0,
+      overtime_minutes: clampNonNegInt(e.overtime_minutes),
       remarks: (e.remarks ?? "").trim() || null,
       status: e.status === "rejected" ? "rejected" : "approved",
     };

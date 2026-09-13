@@ -105,6 +105,16 @@ export const fetchAttendanceApprovalsByEmployeeRange = async (employeeId, dateFr
   return data?.data ?? [];
 };
 
+export const fetchOvertimeRequestsByEmployeeRange = async (employeeId, dateFrom, dateTo) => {
+  const params = new URLSearchParams();
+  params.set("limit", "-1");
+  params.set("filter[user_id][_eq]", String(employeeId));
+  params.set("filter[request_date][_between]", `${dateFrom},${dateTo}`);
+
+  const { data } = await api.get(`/items/overtime_request?${params.toString()}`);
+  return data?.data ?? [];
+};
+
 export const fetchAttendanceApprovalsByEmployeeDay = async (employeeId, ymd) => {
   const params = new URLSearchParams();
   params.set("limit", "-1");
@@ -231,12 +241,12 @@ function parseDT(x) {
  * - grace = 5 mins
  * - default work = 8 hrs (480)
  * - if time_out missing and has time_in => 4 hrs (240)
- * - overtime ALWAYS 0
+ * - overtime: compute excess out, if >= 90 and approved OT request exists, set to excess out.
  *
  * Late = max(0, time_in - (work_start+5m))
  * Undertime = if time_out exists and < work_end => work_end - time_out else 0
  */
-export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow) => {
+export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow, otReq) => {
   const sch = scheduleRow || {};
   const workStartStr = normalizeTimeHHmm(sch.work_start) || "08:00";
   const workEndStr = normalizeTimeHHmm(sch.work_end) || "17:00";
@@ -281,10 +291,19 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow) => {
     undertime = workEnd.diff(timeOut, "minute");
   }
 
+  // 5. OVERTIME CALCULATION
+  let overtime = 0;
+  if (timeOut && timeOut.isAfter(workEnd)) {
+    const excessOut = timeOut.diff(workEnd, "minute");
+    if (otReq && otReq.status === 'approved') {
+      overtime = excessOut;
+    }
+  }
+
   return {
     work_minutes: clampNonNegInt(work), // Always 480
     late_minutes: clampNonNegInt(late),
     undertime_minutes: clampNonNegInt(undertime),
-    overtime_minutes: 0,
+    overtime_minutes: clampNonNegInt(overtime),
   };
 };
