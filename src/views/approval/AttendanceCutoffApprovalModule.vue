@@ -214,6 +214,10 @@
   <div class="ac-badges">
     <span v-if="r.isUnsynced" class="pill pill-danger">MISSING APPROVAL RECORD</span>
 
+    <span v-if="r.otReq" class="pill" :class="String(r.otReq.status || '').toLowerCase() === 'approved' ? 'pill-success' : 'pill-warning'">
+      OT: {{ r.otReq.status || 'Pending' }}
+    </span>
+
     <span v-if="r.no_log" class="pill pill-danger">no log</span>
     <span v-else class="pill" :class="r.log_approve_status === 'pending' ? 'pill-warning' : 'pill-muted'">
         log: {{ r.log_approve_status || "—" }}
@@ -677,13 +681,22 @@ async function loadEmployeeRows() {
     ]);
 
     const apprByDate = new Map();
-    for (const a of approvals || []) apprByDate.set(String(a.date_schedule), a);
+    for (const a of approvals || []) {
+      const dt = String(a.date_schedule || '').slice(0, 10);
+      if (dt) apprByDate.set(dt, a);
+    }
     
     const logByDate = new Map();
-    for (const l of logs || []) logByDate.set(String(l.log_date), l);
+    for (const l of logs || []) {
+      const dt = String(l.log_date || '').slice(0, 10);
+      if (dt) logByDate.set(dt, l);
+    }
     
     const otByDate = new Map();
-    for (const ot of overtimes || []) otByDate.set(String(ot.request_date), ot);
+    for (const ot of overtimes || []) {
+      const dt = String(ot.request_date || '').slice(0, 10);
+      if (dt) otByDate.set(dt, ot);
+    }
     
     const schedule = getScheduleForUser(selectedEmployeeId.value) || getScheduleForDept(selectedEmployeeDeptId.value);
 
@@ -699,6 +712,8 @@ async function loadEmployeeRows() {
       let undertime_minutes = Number(a?.undertime_minutes ?? 0);
       let overtime_minutes = Number(a?.overtime_minutes ?? 0);
 
+      const hasApprovedOt = otReq && String(otReq.status || '').toLowerCase() === 'approved';
+
       // If values are 0 OR the record is missing, compute from logs
       if (l && (!approvalId || (work_minutes === 0 && late_minutes === 0 && undertime_minutes === 0 && overtime_minutes === 0))) {
         const computed = computeApprovalMinutes(d, l, schedule, otReq);
@@ -706,6 +721,12 @@ async function loadEmployeeRows() {
         late_minutes = computed.late_minutes;
         undertime_minutes = computed.undertime_minutes;
         overtime_minutes = computed.overtime_minutes;
+      } else if (l && overtime_minutes === 0 && hasApprovedOt) {
+        // If an approval record already existed with 0 overtime but an approved OT request is present, calculate overtime
+        const computed = computeApprovalMinutes(d, l, schedule, otReq);
+        if (computed.overtime_minutes > 0) {
+          overtime_minutes = computed.overtime_minutes;
+        }
       }
 
       return {
@@ -912,6 +933,7 @@ select, input { width:100%; height:44px; padding:10px 12px; border:1px solid #e5
 .pill{ display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:900; border:1px solid #e5e7eb; background:#f9fafb; color:#374151; white-space: nowrap; }
 .pill-warning{ background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.25); color:#92400e; }
 .pill-danger{ background:#fef3f2; border-color:#fee2e2; color:#b42318; }
+.pill-success{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
 .pill-muted{ color: #6b7280; }
 
 /* ================= BUTTONS ================= */

@@ -293,11 +293,30 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow, otReq) => {
 
   // 5. OVERTIME CALCULATION
   let overtime = 0;
-  if (timeOut && timeOut.isAfter(workEnd)) {
+  const isOtApproved = otReq && String(otReq.status || '').toLowerCase() === 'approved';
+  if (timeOut && timeOut.isAfter(workEnd) && isOtApproved) {
     const excessOut = timeOut.diff(workEnd, "minute");
-    if (otReq && otReq.status === 'approved') {
-      overtime = excessOut;
+    let otDurationCap = Infinity;
+
+    // Check if otReq specifies duration or start/end times
+    const reqDuration = Number(otReq.duration_minutes ?? otReq.duration ?? 0);
+    if (reqDuration > 0) {
+      otDurationCap = reqDuration;
+    } else if (otReq.from && otReq.to) {
+      const otStart = dayjs(`${dateYmd} ${otReq.from}`);
+      const otEnd = dayjs(`${dateYmd} ${otReq.to}`);
+      if (otStart.isValid() && otEnd.isValid() && otEnd.isAfter(otStart)) {
+        otDurationCap = otEnd.diff(otStart, "minute");
+      }
+    } else if (otReq.start_time && otReq.end_time) {
+      const otStart = dayjs(otReq.start_time);
+      const otEnd = dayjs(otReq.end_time);
+      if (otStart.isValid() && otEnd.isValid() && otEnd.isAfter(otStart)) {
+        otDurationCap = otEnd.diff(otStart, "minute");
+      }
     }
+
+    overtime = Math.min(excessOut, otDurationCap);
   }
 
   return {
