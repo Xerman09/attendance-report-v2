@@ -173,11 +173,11 @@
                 <!-- ✅ Miggle badge + dropdown trigger -->
                 <td class="no-print">
                   <div class="geo-actions">
-                    <span v-if="hasGeotag(r.log_id)" class="badge-miggle">Miggle</span>
+                    <span v-if="shouldShowMiggle(r)" class="badge-miggle">Miggle</span>
                     <span v-else class="muted small">—</span>
 
                     <button
-                      v-if="hasGeotag(r.log_id)"
+                      v-if="shouldShowMiggle(r)"
                       class="btn btn-ghost btn-mini"
                       type="button"
                       @click="toggleGeo(r.log_id)"
@@ -330,6 +330,7 @@ import {
   fetchOnCallList,
   fetchOnCallSchedules,
   fetchGeotags,
+  fetchGeneralSettings,
   getDirectImageUrl,
 } from "../../services/api";
 
@@ -395,6 +396,7 @@ const onCallList = ref([]);
 const onCallSchedules = ref([]);
 
 const geotags = ref([]);
+const generalSettings = ref([]);
 const geoOpen = ref({}); // { [logId: string]: boolean }
 
 const fromDate = ref("");
@@ -856,7 +858,7 @@ const printDetails = () => {
 const quickSelect = ref("");
 
 onMounted(async () => {
-  const [u, s, a, d, ocList, ocScheds, g] = await Promise.all([
+  const [u, s, a, d, ocList, ocScheds, g, gs] = await Promise.all([
     fetchUsers(),
     fetchSchedules(),
     fetchAttendance(),
@@ -864,6 +866,7 @@ onMounted(async () => {
     fetchOnCallList(),
     fetchOnCallSchedules(),
     fetchGeotags(),
+    fetchGeneralSettings(),
   ]);
 
   users.value = u;
@@ -873,6 +876,7 @@ onMounted(async () => {
   onCallList.value = ocList;
   onCallSchedules.value = ocScheds;
   geotags.value = g;
+  generalSettings.value = gs;
 
   const y = dayjs().subtract(1, "day");
   toDate.value = y.format("YYYY-MM-DD");
@@ -949,6 +953,36 @@ function geotagsForLog(logId) {
 
 function hasGeotag(logId) {
   return geotagsForLog(logId).length > 0;
+}
+
+const miggleAlwaysOnDept6 = computed(() => {
+  const item = (generalSettings.value || []).find(
+    (s) => String(s.setting_key || "").trim() === "miggle_always_on_dept_6"
+  );
+  if (!item || item.setting_value == null) {
+    return false; // automatically 0 if key is not available in database
+  }
+  const val = String(item.setting_value).trim();
+  return val === "1" || val.toLowerCase() === "true";
+});
+
+const isEmployeeDept6 = computed(() => {
+  const d = emp.value?.user_department;
+  return Number(d) === 6 || String(d).trim() === "6";
+});
+
+function shouldShowMiggle(rOrLogId) {
+  const r = typeof rOrLogId === "object" && rOrLogId !== null ? rOrLogId : null;
+  const logId = r ? r.log_id : rOrLogId;
+  const isDept6 =
+    isEmployeeDept6.value ||
+    Number(r?.department_id) === 6 ||
+    String(r?.department_id).trim() === "6";
+
+  if (isDept6 && miggleAlwaysOnDept6.value) {
+    return true;
+  }
+  return hasGeotag(logId);
 }
 
 function toggleGeo(logId) {

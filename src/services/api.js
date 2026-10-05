@@ -191,6 +191,41 @@ export const fetchGeotags = async () => {
   return data?.data ?? [];
 };
 
+export const fetchGeneralSettings = async () => {
+  try {
+    const { data } = await api.get("/items/general_setting?limit=-1");
+    return data?.data ?? [];
+  } catch (err) {
+    console.warn("fetchGeneralSettings failed:", err?.message || err);
+    return [];
+  }
+};
+
+export const fetchGeneralSettingByKey = async (key) => {
+  try {
+    const params = new URLSearchParams();
+    params.set("limit", "1");
+    params.set("filter[setting_key][_eq]", String(key));
+    const { data } = await api.get(`/items/general_setting?${params.toString()}`);
+    return data?.data?.[0] ?? null;
+  } catch (err) {
+    console.warn(`fetchGeneralSettingByKey failed for ${key}:`, err?.message || err);
+    return null;
+  }
+};
+
+export const getGeneralSettingValue = async (key, defaultValue = "0") => {
+  try {
+    const setting = await fetchGeneralSettingByKey(key);
+    if (!setting || setting.setting_value == null) {
+      return defaultValue;
+    }
+    return String(setting.setting_value).trim();
+  } catch {
+    return defaultValue;
+  }
+};
+
 /* =========================================================
    HELPERS FOR CUTOFF APPROVAL MODULE
 ========================================================= */

@@ -181,11 +181,11 @@
               <!-- ✅ Miggle badge + dropdown trigger -->
               <td class="no-print">
                 <div class="geo-actions" v-if="r.log_id">
-                  <span v-if="hasGeotag(r.log_id)" class="badge-miggle">Miggle</span>
+                  <span v-if="shouldShowMiggle(r)" class="badge-miggle">Miggle</span>
                   <span v-else class="muted small">—</span>
 
                   <button
-                    v-if="hasGeotag(r.log_id)"
+                    v-if="shouldShowMiggle(r)"
                     class="btn btn-ghost btn-mini"
                     type="button"
                     @click="toggleGeo(r.log_id)"
@@ -329,6 +329,7 @@ import {
   fetchOnCallList,
   fetchOnCallSchedules,
   fetchGeotags,
+  fetchGeneralSettings,
   getDirectImageUrl,
 } from "../../services/api";
 import { computeStatus, minutesToHHMM } from "../../utils/time";
@@ -340,6 +341,7 @@ const attendance = ref([]);
 
 /* --- geotags --- */
 const geotags = ref([]);
+const generalSettings = ref([]);
 const geoOpen = ref({});
 
 /* --- jake-oncall datasets --- */
@@ -568,7 +570,7 @@ function buildRow(u, ymd) {
   if (!isWorkingDay) {
     return {
       key: `r-${u.user_id}-${ymd}`,
-      log_id: rec ? rec.log_id : null,
+      log_id: rec ? rec.log_id : `rest-${u.user_id}-${ymd}`,
       empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
       status: "Rest Day",
       punctuality: "—",
@@ -584,7 +586,7 @@ function buildRow(u, ymd) {
   if (!rec || (!rec.time_in && !rec.time_out)) {
     return {
       key: `r-${u.user_id}-${ymd}`,
-      log_id: rec ? rec.log_id : null,
+      log_id: rec ? rec.log_id : `abs-${u.user_id}-${ymd}`,
       empName: `${u.user_fname || ""} ${u.user_lname || ""}`.trim(),
       status: "Absent",
       punctuality: "—",
@@ -748,7 +750,7 @@ const totalLateHHMM = computed(() => minutesToHHMM(totalLateMinutes.value));
 const totalOvertimeHHMM = computed(() => minutesToHHMM(totalOvertimeMinutes.value));
 
 onMounted(async () => {
-  const [u, d, s, a, ocList, ocScheds, g] = await Promise.all([
+  const [u, d, s, a, ocList, ocScheds, g, gs] = await Promise.all([
     fetchUsers(),
     fetchDepartments(),
     fetchSchedules(),
@@ -756,6 +758,7 @@ onMounted(async () => {
     fetchOnCallList(),
     fetchOnCallSchedules(),
     fetchGeotags(),
+    fetchGeneralSettings(),
   ]);
   users.value = u;
   departments.value = d;
@@ -764,6 +767,7 @@ onMounted(async () => {
   onCallList.value = ocList;
   onCallSchedules.value = ocScheds;
   geotags.value = g;
+  generalSettings.value = gs;
 
   if (d && d.length) deptId.value = d[0].department_id;
 
@@ -850,6 +854,32 @@ function geotagsForLog(logId) {
 
 function hasGeotag(logId) {
   return geotagsForLog(logId).length > 0;
+}
+
+const miggleAlwaysOnDept6 = computed(() => {
+  const item = (generalSettings.value || []).find(
+    (s) => String(s.setting_key || "").trim() === "miggle_always_on_dept_6"
+  );
+  if (!item || item.setting_value == null) {
+    return false; // automatically 0 if key is not available in database
+  }
+  const val = String(item.setting_value).trim();
+  return val === "1" || val.toLowerCase() === "true";
+});
+
+function shouldShowMiggle(rOrLogId) {
+  const r = typeof rOrLogId === "object" && rOrLogId !== null ? rOrLogId : null;
+  const logId = r ? r.log_id : rOrLogId;
+  const isDept6 =
+    Number(deptId.value) === 6 ||
+    String(deptId.value).trim() === "6" ||
+    Number(r?.rawUser?.user_department) === 6 ||
+    String(r?.rawUser?.user_department).trim() === "6";
+
+  if (isDept6 && miggleAlwaysOnDept6.value) {
+    return true;
+  }
+  return hasGeotag(logId);
 }
 
 function toggleGeo(logId) {
