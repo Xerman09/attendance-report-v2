@@ -181,11 +181,11 @@
               <!-- ✅ Miggle badge + dropdown trigger -->
               <td class="no-print">
                 <div class="geo-actions" v-if="r.log_id">
-                  <span v-if="shouldShowMiggle(r)" class="badge-miggle">Miggle</span>
-                  <span v-else class="muted small">—</span>
+                  <span v-if="shouldShowMiggleBadge(r)" class="badge-miggle">Miggle</span>
+                  <span v-else-if="!shouldShowViewButton(r)" class="muted small">—</span>
 
                   <button
-                    v-if="shouldShowMiggle(r)"
+                    v-if="shouldShowViewButton(r)"
                     class="btn btn-ghost btn-mini"
                     type="button"
                     @click="toggleGeo(r.log_id)"
@@ -867,9 +867,26 @@ const miggleAlwaysOnDept6 = computed(() => {
   return val === "1" || val.toLowerCase() === "true";
 });
 
-function shouldShowMiggle(rOrLogId) {
+function isAbsentOrRestDay(r) {
+  if (!r) return false;
+  const s = String(computeRowStatus(r) || r.status || "").toLowerCase().trim();
+  return (
+    s.includes("absent") ||
+    s.includes("rest") ||
+    s.includes("prehire") ||
+    s.includes("no show")
+  );
+}
+
+function shouldShowMiggleBadge(rOrLogId) {
   const r = typeof rOrLogId === "object" && rOrLogId !== null ? rOrLogId : null;
   const logId = r ? r.log_id : rOrLogId;
+
+  // Never show badge if absent or restday
+  if (r && isAbsentOrRestDay(r)) {
+    return false;
+  }
+
   const isDept6 =
     Number(deptId.value) === 6 ||
     String(deptId.value).trim() === "6" ||
@@ -880,6 +897,31 @@ function shouldShowMiggle(rOrLogId) {
     return true;
   }
   return hasGeotag(logId);
+}
+
+function shouldShowViewButton(rOrLogId) {
+  const r = typeof rOrLogId === "object" && rOrLogId !== null ? rOrLogId : null;
+  const logId = r ? r.log_id : rOrLogId;
+
+  // If absent or rest day, only show View button if actual geotag evidence exists
+  if (r && isAbsentOrRestDay(r)) {
+    return hasGeotag(logId);
+  }
+
+  const isDept6 =
+    Number(deptId.value) === 6 ||
+    String(deptId.value).trim() === "6" ||
+    Number(r?.rawUser?.user_department) === 6 ||
+    String(r?.rawUser?.user_department).trim() === "6";
+
+  if (isDept6 && miggleAlwaysOnDept6.value) {
+    return true;
+  }
+  return hasGeotag(logId);
+}
+
+function shouldShowMiggle(rOrLogId) {
+  return shouldShowMiggleBadge(rOrLogId);
 }
 
 function toggleGeo(logId) {
