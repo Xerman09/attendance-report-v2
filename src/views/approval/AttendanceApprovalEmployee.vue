@@ -129,7 +129,12 @@
 
         <template v-else>
           <div class="emp-meta">
-            <div class="emp-meta__name">{{ selectedEmployeeName }}</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="emp-meta__name">{{ selectedEmployeeName }}</div>
+              <span v-if="isFlexibleScheduleUser(selectedEmployee?.is_flexible_schedule)" class="pill pill-muted" style="font-size: 11px; font-weight: 700;">
+                Flexible Schedule
+              </span>
+            </div>
             <div class="emp-meta__sub">
               Department ID: {{ selectedEmployeeDeptId ?? "—" }}
               <span class="dot">•</span>
@@ -232,6 +237,7 @@ import {
   fetchAttendanceApprovalsByEmployeeRange,
   createAttendanceApproval,
   updateAttendanceApproval,
+  isFlexibleScheduleUser,
 } from "../../services/api";
 import { login, getCurrentUser, logout } from "../../services/auth";
 

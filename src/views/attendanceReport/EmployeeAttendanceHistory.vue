@@ -332,6 +332,7 @@ import {
   fetchGeotags,
   fetchGeneralSettings,
   getDirectImageUrl,
+  isFlexibleScheduleUser,
 } from "../../services/api";
 
 import {
@@ -668,7 +669,13 @@ const rows = computed(() => {
       }
     }
 
-    const finalStatus = isRest ? "Rest Day" : baseStat.status;
+    let finalStatus = isRest ? "Rest Day" : baseStat.status;
+    const isFlexible = isFlexibleScheduleUser(emp.value?.is_flexible_schedule);
+    const isExemptFromDeptLate = isFlexible && source !== "oncall";
+    if (isExemptFromDeptLate) {
+      customLateMinutes = 0;
+      if (finalStatus === "Late") finalStatus = "On Time";
+    }
     const isOff = finalStatus === "Rest Day" || finalStatus === "Absent" || finalStatus === "Prehire";
 
     let tOutParsed = isRest && !l.time_out

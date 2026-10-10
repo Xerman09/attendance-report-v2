@@ -102,6 +102,7 @@
                 <div class="emp">
                   <div class="name">
                     {{ r.empName }}
+                    <span v-if="isFlexibleScheduleUser(r.rawUser?.is_flexible_schedule)" class="pill pill-muted" style="margin-left: 6px; font-size: 10px;" title="Flexible Schedule (exempt from dept lateness)">Flex</span>
                     <span v-if="r.isMissing" class="missing-tag">missing</span>
                     <span v-if="!isActiveUser(r.rawUser)" style="color: #ef4444; font-size: 11px; margin-left: 6px; font-weight: 500;">(Inactive)</span>
                   </div>
@@ -170,6 +171,7 @@ import {
   fetchAttendanceApprovalsByDate,
   createAttendanceApproval,
   updateAttendanceApproval,
+  isFlexibleScheduleUser,
 } from "../../services/api";
 import { login, getCurrentUser, logout } from "../../services/auth";
 

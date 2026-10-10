@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 
 // Accessing environment variables
 const BASE_URL = "/api";
-const STATIC_TOKEN = import.meta.env.VITE_STATIC_TOKEN || "";
+const STATIC_TOKEN = import.meta?.env?.VITE_STATIC_TOKEN || "";
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -140,13 +140,23 @@ export const fetchAttendanceApprovalsByDate = async (ymd, employeeIds = []) => {
 };
 
 export const fetchOnCallList = async () => {
-  const { data } = await api.get("/items/oncall_list?limit=-1");
-  return data?.data ?? [];
+  try {
+    const { data } = await api.get("/items/oncall_list?limit=-1");
+    return data?.data ?? [];
+  } catch (err) {
+    console.warn("fetchOnCallList failed:", err?.message || err);
+    return [];
+  }
 };
 
 export const fetchOnCallSchedules = async () => {
-  const { data } = await api.get("/items/oncall_schedule?limit=-1");
-  return data?.data ?? [];
+  try {
+    const { data } = await api.get("/items/oncall_schedule?limit=-1");
+    return data?.data ?? [];
+  } catch (err) {
+    console.warn("fetchOnCallSchedules failed:", err?.message || err);
+    return [];
+  }
 };
 
 export const fetchLeaveRequests = async () => {
@@ -226,6 +236,48 @@ export const getGeneralSettingValue = async (key, defaultValue = "0") => {
   }
 };
 
+/**
+ * Value Parsing Helper (MySQL / Directus Resilient)
+ * Handles boolean, number, string, and raw Directus buffer shapes.
+ */
+export function isFlexibleScheduleUser(val) {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "number") return val !== 0;
+  if (val === "1" || val === "true") return true;
+  if (val && typeof val === "object") {
+    const buf = val;
+    if (buf.type === "Buffer" && Array.isArray(buf.data)) {
+      return buf.data[0] === 1;
+    }
+  }
+  return false;
+}
+
+/**
+ * Fetch configurable missing time-out undertime penalty from general_setting
+ * Default is 240 minutes if missing, null, or empty.
+ */
+export const fetchNoTimeOutUndertimePenalty = async () => {
+  try {
+    const setting = await fetchGeneralSettingByKey("payroll_no_time_out_undertime_amount");
+    if (
+      setting &&
+      setting.setting_value !== undefined &&
+      setting.setting_value !== null &&
+      String(setting.setting_value).trim() !== ""
+    ) {
+      const parsed = Number(setting.setting_value);
+      if (!isNaN(parsed) && parsed >= 0) {
+        return parsed;
+      }
+    }
+    return 240;
+  } catch (err) {
+    console.warn("fetchNoTimeOutUndertimePenalty failed:", err?.message || err);
+    return 240;
+  }
+};
+
 /* =========================================================
    HELPERS FOR CUTOFF APPROVAL MODULE
 ========================================================= */
@@ -272,30 +324,61 @@ function parseDT(x) {
 }
 
 /**
- * RULES:
- * - grace = 5 mins
- * - default work = 8 hrs (480)
- * - if time_out missing and has time_in => 4 hrs (240)
- * - overtime: compute excess out, if >= 90 and approved OT request exists, set to excess out.
- *
- * Late = max(0, time_in - (work_start+5m))
- * Undertime = if time_out exists and < work_end => work_end - time_out else 0
+ * RULES & SPECIFICATION:
+ * 1. Flexible Schedule Exemption:
+ *    - Employees with is_flexible_schedule === 1 are NOT penalized for lateness when
+ *      their working hours follow a standard Department Schedule (source !== "oncall").
+ *    - late_minutes = 0, status resolves to "On Time".
+ *    - On-Call schedules (source === "oncall") are NOT exempt from lateness.
+ * 2. Configurable Missing Time-Out Undertime Penalty & Balancing:
+ *    - Actual undertime: schedEnd - actualOut if actualOut < schedEnd.
+ *    - Missing time-out penalty: configured via payroll_no_time_out_undertime_amount (default 240).
+ *    - 480-minute cap balancing rule: if (late + penalty > 480) undertime = max(0, 480 - late) else penalty.
+ * 3. Overtime: Excess out if approved OT request exists.
  */
-export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow, otReq) => {
+export const computeApprovalMinutes = (
+  dateYmd,
+  logRow,
+  scheduleRow,
+  otReq,
+  userOrOptions,
+  penaltyOpt
+) => {
+  let userRow = null;
+  let noTimeOutPenalty = 240;
+
+  if (typeof userOrOptions === "number") {
+    noTimeOutPenalty = userOrOptions;
+  } else if (userOrOptions && typeof userOrOptions === "object") {
+    if ("user_id" in userOrOptions || "is_flexible_schedule" in userOrOptions) {
+      userRow = userOrOptions;
+    } else if ("user" in userOrOptions) {
+      userRow = userOrOptions.user;
+    }
+    if (typeof userOrOptions.noTimeOutPenalty === "number") {
+      noTimeOutPenalty = userOrOptions.noTimeOutPenalty;
+    } else if (typeof userOrOptions.penalty === "number") {
+      noTimeOutPenalty = userOrOptions.penalty;
+    }
+  }
+
+  if (typeof penaltyOpt === "number") {
+    noTimeOutPenalty = penaltyOpt;
+  }
+
+  if (!userRow) {
+    userRow = logRow?.user || logRow?.rawUser || scheduleRow?.user || null;
+  }
+
   const sch = scheduleRow || {};
-  const workStartStr = normalizeTimeHHmm(sch.work_start) || "08:00";
-  const workEndStr = normalizeTimeHHmm(sch.work_end) || "17:00";
+  const workStartStr = normalizeTimeHHmm(sch.work_start || sch.time_in) || "08:00";
+  const workEndStr = normalizeTimeHHmm(sch.work_end || sch.time_out) || "17:00";
 
   const GRACE_MINUTES = sch.grace_period != null ? Number(sch.grace_period) : 5;
   const FULL_DAY_MINUTES = 480;
-  const HALF_DAY_MINUTES = 240;
 
   const timeIn = parseDT(logRow?.time_in);
   const timeOut = parseDT(logRow?.time_out);
-
-  const workStart = dayjs(`${dateYmd} ${workStartStr}`);
-  const workEnd = dayjs(`${dateYmd} ${workEndStr}`);
-  const gracePoint = workStart.add(GRACE_MINUTES, "minute");
 
   // 1. ABSENT GUARD: If no time in, everything is 0
   if (!timeIn) {
@@ -304,26 +387,55 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow, otReq) => {
       late_minutes: 0,
       undertime_minutes: 0,
       overtime_minutes: 0,
+      status: "Absent",
+      isExemptFromLate: false,
     };
   }
+
+  // Schedule source: "oncall" vs "department"
+  const schedSource = sch.source || (sch.is_oncall ? "oncall" : "department");
+  const isFlexible = isFlexibleScheduleUser(userRow?.is_flexible_schedule ?? sch.is_flexible_schedule);
+  const isExemptFromLate = isFlexible && schedSource === "department";
 
   // 2. WORK MINUTES: Default to 480 since they have a Time In
   let work = FULL_DAY_MINUTES;
 
+  const workStart = dayjs(`${dateYmd} ${workStartStr}`);
+  const workEnd = dayjs(`${dateYmd} ${workEndStr}`);
+  const gracePoint = workStart.add(GRACE_MINUTES, "minute");
+
   // 3. LATE CALCULATION
   let late = 0;
-  if (timeIn.isAfter(gracePoint)) {
-    late = timeIn.diff(workStart, "minute");
+  if (timeIn.isAfter(workEnd)) {
+    // Clocked in past scheduled time-out:
+    // If exempt, late is 0; otherwise capped to 240 (half day)
+    late = isExemptFromLate ? 0 : 240;
+  } else {
+    // Normal clock-in calculation:
+    const diffInMs = timeIn.diff(workStart, "minute");
+    if (!isExemptFromLate && diffInMs > GRACE_MINUTES) {
+      late = diffInMs;
+    } else {
+      late = 0;
+    }
   }
 
   // 4. UNDERTIME CALCULATION
   let undertime = 0;
-  if (!timeOut) {
-    // No timeout = Automatic 240 mins undertime
-    undertime = HALF_DAY_MINUTES;
-  } else if (timeOut.isBefore(workEnd)) {
-    // Early out = difference from scheduled end
-    undertime = workEnd.diff(timeOut, "minute");
+  if (timeOut) {
+    // Normal undertime if left early
+    if (timeOut.isBefore(workEnd)) {
+      undertime = workEnd.diff(timeOut, "minute");
+    } else {
+      undertime = 0;
+    }
+  } else {
+    // MISSING TIME OUT: Apply setting-based penalty with 480-minute cap
+    if (late + noTimeOutPenalty > 480) {
+      undertime = Math.max(0, 480 - late);
+    } else {
+      undertime = noTimeOutPenalty;
+    }
   }
 
   // 5. OVERTIME CALCULATION
@@ -354,10 +466,20 @@ export const computeApprovalMinutes = (dateYmd, logRow, scheduleRow, otReq) => {
     overtime = Math.min(excessOut, otDurationCap);
   }
 
+  // 6. STATUS RESOLUTION
+  let computedStatus = logRow?.remarks || logRow?.status || (timeIn ? "On Time" : "Absent");
+  if (isExemptFromLate && computedStatus === "Late" && !logRow?.remarks) {
+    computedStatus = "On Time";
+  } else if (!isExemptFromLate && late > 0 && computedStatus === "On Time") {
+    computedStatus = "Late";
+  }
+
   return {
-    work_minutes: clampNonNegInt(work), // Always 480
+    work_minutes: clampNonNegInt(work),
     late_minutes: clampNonNegInt(late),
     undertime_minutes: clampNonNegInt(undertime),
     overtime_minutes: clampNonNegInt(overtime),
+    status: computedStatus,
+    isExemptFromLate,
   };
 };

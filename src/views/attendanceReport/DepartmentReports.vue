@@ -331,6 +331,7 @@ import {
   fetchGeotags,
   fetchGeneralSettings,
   getDirectImageUrl,
+  isFlexibleScheduleUser,
 } from "../../services/api";
 import { computeStatus, minutesToHHMM } from "../../utils/time";
 
@@ -666,7 +667,9 @@ function buildRow(u, ymd) {
     breakExtra = Math.max(0, dur - 30);
   }
 
-  const customLateMinutes = Math.max(0, lateFromIn + lunchExtra + breakExtra);
+  const isFlexible = isFlexibleScheduleUser(u?.is_flexible_schedule);
+  const isExemptFromDeptLate = isFlexible && source !== "oncall";
+  const customLateMinutes = isExemptFromDeptLate ? 0 : Math.max(0, lateFromIn + lunchExtra + breakExtra);
   const status = "Present";
   const punctuality = customLateMinutes > 0 ? "Late" : "On Time";
 
